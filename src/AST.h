@@ -125,6 +125,16 @@ struct FunctionAST
 
     FunctionAST(const std::string& name, std::shared_ptr<BlockAST> block);
     
-    void Dump(uint32_t indentCount = 0) const;
+    void Dump(uint32_t indentCount) const;
     llvm::Function* Codegen() const;
+};
+
+struct ParsedFile
+{
+    std::vector<std::shared_ptr<FunctionAST>> functions;
+
+    ParsedFile(const std::vector<std::shared_ptr<FunctionAST>>& functions);
+
+    void Dump(uint32_t indentCount = 0) const;
+    void Codegen() const;
 };

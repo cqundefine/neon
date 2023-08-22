@@ -10,7 +10,7 @@ class Parser
 public:
     Parser(Lexer& lexer);
 
-    std::shared_ptr<FunctionAST> Parse();
+    std::shared_ptr<ParsedFile> Parse();
 
 private:
     std::shared_ptr<BlockAST> ParseBlock();

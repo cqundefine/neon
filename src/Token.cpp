@@ -3,7 +3,7 @@
 
 std::string TokenTypeToString(TokenType tokenType)
 {
-    static_assert(static_cast<uint32_t>(TokenType::_TokenTypeCount) == 19, "Not all tokens are handled in Token::ToString()");
+    static_assert(static_cast<uint32_t>(TokenType::_TokenTypeCount) == 20, "Not all tokens are handled in Token::ToString()");
 
     switch (tokenType)
     {
@@ -45,6 +45,8 @@ std::string TokenTypeToString(TokenType tokenType)
             return "Return";
         case TokenType::If:
             return "If";
+        case TokenType::Extern:
+            return "Extern";
         default:
             assert(false);
     }
@@ -52,7 +54,7 @@ std::string TokenTypeToString(TokenType tokenType)
 
 std::string Token::ToString()
 {
-    static_assert(static_cast<uint32_t>(TokenType::_TokenTypeCount) == 19, "Not all tokens are handled in Token::ToString()");
+    static_assert(static_cast<uint32_t>(TokenType::_TokenTypeCount) == 20, "Not all tokens are handled in Token::ToString()");
     switch(type)
     {
         case TokenType::Number:
@@ -93,6 +95,8 @@ std::string Token::ToString()
             return "Return (`return`)";
         case TokenType::If:
             return "If (`if`)";
+        case TokenType::Extern:
+            return "Extern (`extern`)";
         default:
             return "Invalid";
     }

@@ -30,9 +30,15 @@ std::unique_ptr<llvm::IRBuilder<>> g_Builder;
 std::unique_ptr<llvm::Module> g_LLVMModule;
 std::unique_ptr<llvm::legacy::FunctionPassManager> g_LLVMFPM;
 
+std::string g_FileName;
+
+Lexer g_Lexer("");
+
 int main(int argc, char** argv)
 {
     assert(argc == 3);
+
+    g_FileName = argv[1];
 
     g_LLVMContext = std::make_unique<llvm::LLVMContext>();
     g_LLVMModule = std::make_unique<llvm::Module>("root", *g_LLVMContext);
@@ -75,44 +81,38 @@ int main(int argc, char** argv)
     g_LLVMModule->setDataLayout(targetMachine->createDataLayout());
     g_LLVMModule->setTargetTriple(targetTriple);
 
-    auto int64Type = llvm::Type::getInt64Ty(*g_LLVMContext);
-
-    llvm::Function::Create(llvm::FunctionType::get(int64Type, false), llvm::Function::ExternalLinkage, "hello", g_LLVMModule.get());
-    llvm::Function::Create(llvm::FunctionType::get(int64Type, {int64Type}, false), llvm::Function::ExternalLinkage, "put_digit", g_LLVMModule.get());
-    llvm::Function::Create(llvm::FunctionType::get(int64Type, {int64Type, int64Type}, false), llvm::Function::ExternalLinkage, "add_two", g_LLVMModule.get());
-    
-    std::ifstream ifs(argv[1]);
+    std::ifstream ifs(g_FileName);
     std::stringstream fileBuffer;
     fileBuffer << ifs.rdbuf();
 
-    Lexer lexer(fileBuffer.str());
+    g_Lexer = Lexer(fileBuffer.str());
     
     if (strcmp(argv[2], "token") == 0)
     {
         Token token;
         do {
-            token = lexer.NextToken();
+            token = g_Lexer.NextToken();
             printf("%s\n", token.ToString().c_str());
         } while (token.type != TokenType::Eof);
         return 0;
     }
 
-    Parser parser(lexer);
+    Parser parser(g_Lexer);
 
-    auto rootFunction = parser.Parse();
+    auto parsedFile = parser.Parse();
     
     if (strcmp(argv[2], "ast") == 0)
     {
-        rootFunction->Dump();
+        parsedFile->Dump();
     }
     else if (strcmp(argv[2], "ir") == 0)
     {
-        rootFunction->Codegen();
+        parsedFile->Codegen();
         g_LLVMModule->print(llvm::errs(), nullptr);
     }
     else if (strcmp(argv[2], "asm") == 0)
     {
-        rootFunction->Codegen();
+        parsedFile->Codegen();
         std::error_code errorCode;
         llvm::raw_fd_ostream outputStream("/dev/stdout", errorCode, llvm::sys::fs::OF_None);
 

@@ -1,21 +1,49 @@
+#include <Error.h>
 #include <Parser.h>
 #include <stack>
 
 extern std::unique_ptr<llvm::LLVMContext> g_LLVMContext;
 
-#define UNEXPECTED_TOKEN(token) do { fprintf(stderr, "Unexpected token: %s\n", token.ToString().c_str()); exit(1); } while(0);
 Parser::Parser(Lexer& lexer) : m_lexer(lexer) {}
 
-std::shared_ptr<FunctionAST> Parser::Parse()
+std::shared_ptr<ParsedFile> Parser::Parse()
 {
-    ExpectToken(TokenType::Function);
-    auto nameToken = m_lexer.NextToken();
-    assert(nameToken.type == TokenType::Identifier);
-    ExpectToken(TokenType::LParen);
-    ExpectToken(TokenType::RParen);
-    ExpectToken(TokenType::Colon);
-    ExpectToken(TokenType::Identifier);
-    return std::make_shared<FunctionAST>(nameToken.stringValue, ParseBlock());
+    std::vector<std::shared_ptr<FunctionAST>> functions;
+    while (true)
+    {
+        auto token = m_lexer.NextToken();
+        if (token.type == TokenType::Extern)
+        {
+            ExpectToken(TokenType::Function);
+            auto nameToken = m_lexer.NextToken();
+            assert(nameToken.type == TokenType::Identifier);
+            ExpectToken(TokenType::LParen);
+            ExpectToken(TokenType::RParen);
+            ExpectToken(TokenType::Colon);
+            ExpectToken(TokenType::Identifier);
+            ExpectToken(TokenType::Semicolon);
+            functions.push_back(std::make_shared<FunctionAST>(nameToken.stringValue, nullptr));
+        }
+        else if (token.type == TokenType::Function)
+        {
+            auto nameToken = m_lexer.NextToken();
+            assert(nameToken.type == TokenType::Identifier);
+            ExpectToken(TokenType::LParen);
+            ExpectToken(TokenType::RParen);
+            ExpectToken(TokenType::Colon);
+            ExpectToken(TokenType::Identifier);
+            functions.push_back(std::make_shared<FunctionAST>(nameToken.stringValue, ParseBlock()));
+        }
+        else if (token.type == TokenType::Eof)
+        {
+            break;
+        }
+        else
+        {
+            Error(token.offset, "Unexpected token: %s", token.ToString().c_str());
+        }
+    }
+    return std::make_shared<ParsedFile>(functions);
 }
 
 std::shared_ptr<BlockAST> Parser::ParseBlock()
@@ -188,7 +216,7 @@ std::shared_ptr<ExpressionAST> Parser::ParsePrimary()
     }
     else
     {
-        UNEXPECTED_TOKEN(token);
+        Error(token.offset, "Unexpected token: %s", token.ToString().c_str());
     }
 }
 
@@ -236,7 +264,6 @@ void Parser::ExpectToken(TokenType tokenType)
     Token token = m_lexer.NextToken();
     if (token.type != tokenType)
     {
-        fprintf(stderr, "Unexpected token %s, expected %s\n", token.ToString().c_str(), TokenTypeToString(tokenType).c_str());
-        printf("%d", static_cast<uint32_t>(tokenType) / 0);
+        Error(token.offset, "Unexpected token %s, expected %s", token.ToString().c_str(), TokenTypeToString(tokenType).c_str());
     }
 }

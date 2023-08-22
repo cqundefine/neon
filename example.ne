@@ -1,3 +1,5 @@
+extern function hello(): void;
+
 function main(): int32
 {
     var: int32;

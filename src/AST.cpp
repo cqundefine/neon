@@ -19,6 +19,7 @@ IfStatementAST::IfStatementAST(std::shared_ptr<ExpressionAST> condition, std::sh
 VariableDefinitionAST::VariableDefinitionAST(const std::string& name, llvm::Type* type) : name(name), type(type) {}
 AssignmentStatementAST::AssignmentStatementAST(std::string name, std::shared_ptr<ExpressionAST> value) : name(name), value(value) {}
 FunctionAST::FunctionAST(const std::string& name, std::shared_ptr<BlockAST> block) : name(name), block(block) {}
+ParsedFile::ParsedFile(const std::vector<std::shared_ptr<FunctionAST>>& functions) : functions(functions) {}
 
 // -------------------------
 // Dump
@@ -43,7 +44,7 @@ void VariableExpressionAST::Dump(uint32_t indentCount) const
 void BinaryExpressionAST::Dump(uint32_t indentCount) const
 {
     INDENT(indentCount);
-    printf("Binary Expression\n");
+    puts("Binary Expression");
     lhs->Dump(indentCount + 1);
     INDENT(indentCount + 1);
     puts(BinaryOperationToString(binaryOperation).c_str());
@@ -61,14 +62,14 @@ void CallExpressionAST::Dump(uint32_t indentCount) const
 void ReturnStatementAST::Dump(uint32_t indentCount) const
 {
     INDENT(indentCount);
-    printf("ReturnStatement\n");
+    puts("ReturnStatement");
     value->Dump(indentCount + 1);
 }
 
 void BlockAST::Dump(uint32_t indentCount) const
 {
     INDENT(indentCount);
-    printf("Block\n");
+    puts("Block");
 
     for(const auto& statement : statements)
     {
@@ -82,7 +83,7 @@ void BlockAST::Dump(uint32_t indentCount) const
 void IfStatementAST::Dump(uint32_t indentCount) const
 {
     INDENT(indentCount);
-    printf("If Statement\n");
+    puts("If Statement");
     condition->Dump(indentCount + 1);
     block->Dump(indentCount + 1);
     if (elseBlock != nullptr)
@@ -106,7 +107,16 @@ void FunctionAST::Dump(uint32_t indentCount) const
 {
     INDENT(indentCount);
     printf("Function (`%s`)\n", name.c_str());
-    block->Dump(indentCount + 1);
+    if (block != nullptr)
+        block->Dump(indentCount + 1);
+}
+
+void ParsedFile::Dump(uint32_t indentCount) const
+{
+    INDENT(indentCount);
+    puts("Parsed File");
+    for (const auto& function : functions)
+        function->Dump(indentCount + 1);
 }
 
 // -------------------------
@@ -260,14 +270,23 @@ llvm::Function* FunctionAST::Codegen() const
     auto functionType = llvm::FunctionType::get(llvm::Type::getInt32Ty(*g_LLVMContext), false);
     auto function = llvm::Function::Create(functionType, llvm::Function::ExternalLinkage, name, g_LLVMModule.get());
     
-    auto basicBlock = llvm::BasicBlock::Create(*g_LLVMContext, "entry", function);
-    g_Builder->SetInsertPoint(basicBlock);
+    if (block != nullptr)
+    {
+        auto basicBlock = llvm::BasicBlock::Create(*g_LLVMContext, "entry", function);
+        g_Builder->SetInsertPoint(basicBlock);
 
-    block->Codegen();
+        block->Codegen();
 
-    llvm::verifyFunction(*function);
+        llvm::verifyFunction(*function);
 
-    //g_LLVMFPM->run(*function);
+        g_LLVMFPM->run(*function);
+    }
 
     return function;
+}
+
+void ParsedFile::Codegen() const
+{
+    for (const auto& function : functions)
+        function->Codegen();
 }

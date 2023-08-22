@@ -28,6 +28,7 @@ enum class TokenType
     Function,
     Return,
     If,
+    Extern,
 
     _TokenTypeCount
 };
@@ -42,6 +43,7 @@ struct Token
     uint64_t intValue;
 
     size_t length;
+    uint32_t offset;
 
     std::string ToString();
 };
