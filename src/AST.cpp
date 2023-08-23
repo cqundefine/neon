@@ -1,4 +1,5 @@
 #include <AST.h>
+#include <Context.h>
 #include <llvm/ADT/APInt.h>
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/IRBuilder.h>
@@ -124,11 +125,6 @@ void ParsedFile::Dump(uint32_t indentCount) const
 // Codegen
 // -------------------------
 
-extern std::unique_ptr<llvm::LLVMContext> g_LLVMContext;
-extern std::unique_ptr<llvm::IRBuilder<>> g_Builder;
-extern std::unique_ptr<llvm::Module> g_LLVMModule;
-extern std::unique_ptr<llvm::legacy::FunctionPassManager> g_LLVMFPM;
-
 llvm::Value* NumberExpressionAST::Codegen() const
 {
     static_assert(static_cast<uint32_t>(NumberType::_NumberTypeCount) == 8, "Not all number types are handled in NumberExpressionAST::Codegen()");
@@ -165,12 +161,12 @@ llvm::Value* NumberExpressionAST::Codegen() const
         assert(false);
     }
 
-    return llvm::ConstantInt::get(*g_LLVMContext, apInt);
+    return llvm::ConstantInt::get(*g_context->llvmContext, apInt);
 }
 
 llvm::Value* VariableExpressionAST::Codegen() const
 {
-    return g_Builder->CreateLoad(allocas[name]->getAllocatedType(), allocas[name], name);
+    return g_context->builder->CreateLoad(allocas[name]->getAllocatedType(), allocas[name], name);
 }
 
 llvm::Value* BinaryExpressionAST::Codegen() const
@@ -180,15 +176,15 @@ llvm::Value* BinaryExpressionAST::Codegen() const
     switch(binaryOperation)
     {
         case BinaryOperation::Add:
-            return g_Builder->CreateAdd(lhs->Codegen(), rhs->Codegen());
+            return g_context->builder->CreateAdd(lhs->Codegen(), rhs->Codegen());
         case BinaryOperation::Subtract:
-            return g_Builder->CreateSub(lhs->Codegen(), rhs->Codegen());
+            return g_context->builder->CreateSub(lhs->Codegen(), rhs->Codegen());
         case BinaryOperation::Multiply:
-            return g_Builder->CreateMul(lhs->Codegen(), rhs->Codegen());
+            return g_context->builder->CreateMul(lhs->Codegen(), rhs->Codegen());
         case BinaryOperation::Divide:
-            return g_Builder->CreateSDiv(lhs->Codegen(), rhs->Codegen());
+            return g_context->builder->CreateSDiv(lhs->Codegen(), rhs->Codegen());
         case BinaryOperation::Equals: {
-            return g_Builder->CreateICmpEQ(lhs->Codegen(), rhs->Codegen()); }
+            return g_context->builder->CreateICmpEQ(lhs->Codegen(), rhs->Codegen()); }
         default:
             assert(false);
     }
@@ -196,19 +192,19 @@ llvm::Value* BinaryExpressionAST::Codegen() const
 
 llvm::Value* CallExpressionAST::Codegen() const
 {
-    auto function = g_LLVMModule->getFunction(calleeName);
+    auto function = g_context->module->getFunction(calleeName);
     assert(function);
 
     std::vector<llvm::Value*> codegennedArgs;
     for (const auto& arg : args)
         codegennedArgs.push_back(arg->Codegen());
 
-    return g_Builder->CreateCall(function, codegennedArgs);
+    return g_context->builder->CreateCall(function, codegennedArgs);
 }
 
 void ReturnStatementAST::Codegen() const
 {
-    g_Builder->CreateRet(value->Codegen());
+    g_context->builder->CreateRet(value->Codegen());
 }
 
 void BlockAST::Codegen() const
@@ -224,65 +220,65 @@ void BlockAST::Codegen() const
 
 void IfStatementAST::Codegen() const
 {  
-    auto conditionFinal = g_Builder->CreateICmpNE(condition->Codegen(), llvm::ConstantInt::get(*g_LLVMContext, llvm::APInt(1, 0)));
-    auto parentFunction = g_Builder->GetInsertBlock()->getParent();
+    auto conditionFinal = g_context->builder->CreateICmpNE(condition->Codegen(), llvm::ConstantInt::get(*g_context->llvmContext, llvm::APInt(1, 0)));
+    auto parentFunction = g_context->builder->GetInsertBlock()->getParent();
     
-    auto thenBlock = llvm::BasicBlock::Create(*g_LLVMContext, "then", parentFunction);
+    auto thenBlock = llvm::BasicBlock::Create(*g_context->llvmContext, "then", parentFunction);
     llvm::BasicBlock* elseBlockB;
     if (elseBlock != nullptr)
-        elseBlockB = llvm::BasicBlock::Create(*g_LLVMContext, "else");
-    auto mergeBlock = llvm::BasicBlock::Create(*g_LLVMContext, "merge");
+        elseBlockB = llvm::BasicBlock::Create(*g_context->llvmContext, "else");
+    auto mergeBlock = llvm::BasicBlock::Create(*g_context->llvmContext, "merge");
 
     if (elseBlock != nullptr)
-        g_Builder->CreateCondBr(conditionFinal, thenBlock, elseBlockB);
+        g_context->builder->CreateCondBr(conditionFinal, thenBlock, elseBlockB);
     else
-        g_Builder->CreateCondBr(conditionFinal, thenBlock, mergeBlock);
+        g_context->builder->CreateCondBr(conditionFinal, thenBlock, mergeBlock);
 
-    g_Builder->SetInsertPoint(thenBlock);
+    g_context->builder->SetInsertPoint(thenBlock);
     block->Codegen();
-    g_Builder->CreateBr(mergeBlock);
+    g_context->builder->CreateBr(mergeBlock);
 
     if (elseBlock != nullptr)
     {
         parentFunction->getBasicBlockList().push_back(elseBlockB);
-        g_Builder->SetInsertPoint(elseBlockB);
+        g_context->builder->SetInsertPoint(elseBlockB);
         elseBlock->Codegen();
-        g_Builder->CreateBr(mergeBlock);
+        g_context->builder->CreateBr(mergeBlock);
     }
 
     parentFunction->getBasicBlockList().push_back(mergeBlock);
-    g_Builder->SetInsertPoint(mergeBlock);
+    g_context->builder->SetInsertPoint(mergeBlock);
 }
 
 void VariableDefinitionAST::Codegen() const
 {
-    auto parentFunction = g_Builder->GetInsertBlock()->getParent();
+    auto parentFunction = g_context->builder->GetInsertBlock()->getParent();
     llvm::IRBuilder<> functionBeginBuilder(&parentFunction->getEntryBlock(), parentFunction->getEntryBlock().begin());
     allocas[name] = functionBeginBuilder.CreateAlloca(type, nullptr, name);
     if (initialValue != nullptr)
-        g_Builder->CreateStore(initialValue->Codegen(), allocas[name]);
+        g_context->builder->CreateStore(initialValue->Codegen(), allocas[name]);
 }
 
 void AssignmentStatementAST::Codegen() const
 {
-    g_Builder->CreateStore(value->Codegen(), allocas[name]);
+    g_context->builder->CreateStore(value->Codegen(), allocas[name]);
 }
 
 llvm::Function* FunctionAST::Codegen() const
 {
-    auto functionType = llvm::FunctionType::get(llvm::Type::getInt32Ty(*g_LLVMContext), false);
-    auto function = llvm::Function::Create(functionType, llvm::Function::ExternalLinkage, name, g_LLVMModule.get());
+    auto functionType = llvm::FunctionType::get(llvm::Type::getInt32Ty(*g_context->llvmContext), false);
+    auto function = llvm::Function::Create(functionType, llvm::Function::ExternalLinkage, name, g_context->module.get());
     
     if (block != nullptr)
     {
-        auto basicBlock = llvm::BasicBlock::Create(*g_LLVMContext, "entry", function);
-        g_Builder->SetInsertPoint(basicBlock);
+        auto basicBlock = llvm::BasicBlock::Create(*g_context->llvmContext, "entry", function);
+        g_context->builder->SetInsertPoint(basicBlock);
 
         block->Codegen();
 
         llvm::verifyFunction(*function);
 
-        g_LLVMFPM->run(*function);
+        g_context->functionPassManager->run(*function);
     }
 
     return function;

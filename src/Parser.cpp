@@ -1,10 +1,7 @@
-#include <Error.h>
 #include <Parser.h>
 #include <stack>
 
-extern std::unique_ptr<llvm::LLVMContext> g_LLVMContext;
-
-Parser::Parser(Lexer& lexer) : m_lexer(lexer) {}
+Parser::Parser(const Lexer& lexer) : m_lexer(lexer) {}
 
 std::shared_ptr<ParsedFile> Parser::Parse()
 {
@@ -40,7 +37,7 @@ std::shared_ptr<ParsedFile> Parser::Parse()
         }
         else
         {
-            Error(token.offset, "Unexpected token: %s", token.ToString().c_str());
+            g_context->Error(token.offset, "Unexpected token: %s", token.ToString().c_str());
         }
     }
     return std::make_shared<ParsedFile>(functions);
@@ -225,7 +222,7 @@ std::shared_ptr<ExpressionAST> Parser::ParsePrimary()
     }
     else
     {
-        Error(token.offset, "Unexpected token: %s", token.ToString().c_str());
+        g_context->Error(token.offset, "Unexpected token: %s", token.ToString().c_str());
     }
 }
 
@@ -257,13 +254,13 @@ llvm::Type* Parser::ParseType()
     Token type = m_lexer.NextToken();
     assert(type.type == TokenType::Identifier);
     if (type.stringValue == "int8" || type.stringValue == "uint8")
-        return reinterpret_cast<llvm::Type*>(llvm::Type::getInt8Ty(*g_LLVMContext));
+        return reinterpret_cast<llvm::Type*>(llvm::Type::getInt8Ty(*g_context->llvmContext));
     else if (type.stringValue == "int16" || type.stringValue == "uint16")
-        return reinterpret_cast<llvm::Type*>(llvm::Type::getInt16Ty(*g_LLVMContext));
+        return reinterpret_cast<llvm::Type*>(llvm::Type::getInt16Ty(*g_context->llvmContext));
     else if (type.stringValue == "int32" || type.stringValue == "uint32")
-        return reinterpret_cast<llvm::Type*>(llvm::Type::getInt32Ty(*g_LLVMContext));
+        return reinterpret_cast<llvm::Type*>(llvm::Type::getInt32Ty(*g_context->llvmContext));
     else if (type.stringValue == "int64" || type.stringValue == "uint64")
-        return reinterpret_cast<llvm::Type*>(llvm::Type::getInt64Ty(*g_LLVMContext));
+        return reinterpret_cast<llvm::Type*>(llvm::Type::getInt64Ty(*g_context->llvmContext));
     else
         assert(false);
 }
@@ -273,6 +270,6 @@ void Parser::ExpectToken(TokenType tokenType)
     Token token = m_lexer.NextToken();
     if (token.type != tokenType)
     {
-        Error(token.offset, "Unexpected token %s, expected %s", token.ToString().c_str(), TokenTypeToString(tokenType).c_str());
+        g_context->Error(token.offset, "Unexpected token %s, expected %s", token.ToString().c_str(), TokenTypeToString(tokenType).c_str());
     }
 }

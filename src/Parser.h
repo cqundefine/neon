@@ -8,7 +8,7 @@
 class Parser
 {
 public:
-    Parser(Lexer& lexer);
+    Parser(const Lexer& lexer);
 
     std::shared_ptr<ParsedFile> Parse();
 
@@ -22,5 +22,5 @@ private:
 
     void ExpectToken(TokenType tokenType);
 
-    Lexer& m_lexer;
+    const Lexer& m_lexer;
 };

@@ -1,0 +1,116 @@
+#include <Context.h>
+
+#include <filesystem>
+#include <llvm/MC/TargetRegistry.h>
+#include <llvm/Support/FileSystem.h>
+#include <llvm/Support/TargetSelect.h>
+#include <llvm/Transforms/InstCombine/InstCombine.h>
+#include <llvm/Transforms/Scalar.h>
+#include <llvm/Transforms/Scalar/GVN.h>
+#include <llvm/Transforms/Utils.h>
+#include <stdarg.h>
+
+Ref<Context> g_context;
+
+Context::Context()
+{
+    llvmContext = MakeOwn<llvm::LLVMContext>();
+    module = MakeOwn<llvm::Module>(filename, *llvmContext);
+    builder = MakeOwn<llvm::IRBuilder<>>(*llvmContext);
+    functionPassManager = MakeOwn<llvm::legacy::FunctionPassManager>(module.get());
+
+    functionPassManager->add(llvm::createPromoteMemoryToRegisterPass());
+    functionPassManager->add(llvm::createInstructionCombiningPass());
+    functionPassManager->add(llvm::createReassociatePass());
+    functionPassManager->add(llvm::createGVNPass());
+    functionPassManager->add(llvm::createCFGSimplificationPass());
+
+    functionPassManager->doInitialization();
+
+    // FIXME: Unhardcode the target
+    auto targetTriple = "x86_64-pc-linux-gnu";
+
+    llvm::InitializeAllTargetInfos();
+    llvm::InitializeAllTargets();
+    llvm::InitializeAllTargetMCs();
+    llvm::InitializeAllAsmParsers();
+    llvm::InitializeAllAsmPrinters();
+
+    std::string error;
+    auto target = llvm::TargetRegistry::lookupTarget(targetTriple, error);
+
+    if (!target)
+    {
+        fprintf(stderr, "Error loading target %s: %s", targetTriple, error.c_str());
+        exit(1);
+    }
+
+    targetMachine = target->createTargetMachine(targetTriple, "generic", "", {}, {});
+
+    module->setDataLayout(targetMachine->createDataLayout());
+    module->setTargetTriple(targetTriple);
+}
+
+std::pair<uint32_t, uint32_t> Context::LineColumnFromOffset(uint32_t offset)
+{
+    uint32_t line = 1;
+    uint32_t column = 1;
+
+    for (uint32_t index = 0; index <= offset; index++)
+    {
+        if (fileContent[index] == '\n')
+        {
+            line++;
+            column = 1;
+        }
+        else
+        {
+            column++;
+        }
+    }
+
+    return { line, column };
+}
+
+[[noreturn]] void Context::Error(uint32_t offset, const char* fmt, ...)
+{
+    auto location = LineColumnFromOffset(offset);
+    fprintf(stderr, "%s:%d:%d ", filename.c_str(),location.first, location.second);
+
+    va_list va;
+    va_start(va, fmt);
+
+    vfprintf(stderr, fmt, va);
+    fputc('\n', stderr);
+
+    va_end(va);
+
+    exit(1);
+}
+
+void Context::Write(OutputFileType fileType)
+{
+    auto sourceFilename = filename.substr(filename.find_last_of("/\\") + 1);
+    auto sourceFilenameWithoutExtension = sourceFilename.substr(0, sourceFilename.length() - sourceFilename.substr(sourceFilename.find_last_of('.') + 1).length() - 1);
+    auto outputFilename = fileType == OutputFileType::Assembly ? sourceFilenameWithoutExtension + ".asm" : sourceFilenameWithoutExtension + ".o";
+
+    std::error_code errorCode;
+    llvm::raw_fd_ostream outputStream(outputFilename, errorCode, llvm::sys::fs::OF_None);
+
+    if (errorCode)
+    {
+        fprintf(stderr, "Error writing output: %s", errorCode.message().c_str());
+        exit(1);
+    }
+
+    llvm::legacy::PassManager pass;
+
+    if (g_context->targetMachine->addPassesToEmitFile(pass, outputStream, nullptr, fileType == OutputFileType::Assembly ? llvm::CGFT_AssemblyFile : llvm::CGFT_ObjectFile))
+    {
+        fprintf(stderr, "This machine can't emit this file type");
+        exit(1);
+    }
+
+    pass.run(*g_context->module);
+    outputStream.flush();
+}
