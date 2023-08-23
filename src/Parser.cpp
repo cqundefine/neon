@@ -94,8 +94,17 @@ ExpressionOrStatement Parser::ParseStatement()
         if (colonOrEquals.type == TokenType::Colon)
         {
             auto type = ParseType();
-            ExpectToken(TokenType::Semicolon);
-            return std::make_shared<VariableDefinitionAST>(token.stringValue, type);
+            auto equalsOrSemicolon = m_lexer.NextToken();
+            if (equalsOrSemicolon.type == TokenType::Semicolon)
+            {
+                return std::make_shared<VariableDefinitionAST>(token.stringValue, type, nullptr);
+            }
+            else
+            {
+                auto initialValue = ParseExpression();
+                ExpectToken(TokenType::Semicolon);
+                return std::make_shared<VariableDefinitionAST>(token.stringValue, type, initialValue);
+            }
         }
         else if (colonOrEquals.type == TokenType::Equals)
         {

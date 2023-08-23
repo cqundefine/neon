@@ -16,7 +16,7 @@ CallExpressionAST::CallExpressionAST(std::string calleeName, std::vector<std::sh
 ReturnStatementAST::ReturnStatementAST(std::shared_ptr<ExpressionAST> value) : value(value) {}
 BlockAST::BlockAST(const std::vector<ExpressionOrStatement>& statements) : statements(statements) {}
 IfStatementAST::IfStatementAST(std::shared_ptr<ExpressionAST> condition, std::shared_ptr<BlockAST> block, std::shared_ptr<BlockAST> elseBlock) : condition(condition), block(block), elseBlock(elseBlock) {}
-VariableDefinitionAST::VariableDefinitionAST(const std::string& name, llvm::Type* type) : name(name), type(type) {}
+VariableDefinitionAST::VariableDefinitionAST(const std::string& name, llvm::Type* type, std::shared_ptr<ExpressionAST> initialValue) : name(name), type(type), initialValue(initialValue) {}
 AssignmentStatementAST::AssignmentStatementAST(std::string name, std::shared_ptr<ExpressionAST> value) : name(name), value(value) {}
 FunctionAST::FunctionAST(const std::string& name, std::shared_ptr<BlockAST> block) : name(name), block(block) {}
 ParsedFile::ParsedFile(const std::vector<std::shared_ptr<FunctionAST>>& functions) : functions(functions) {}
@@ -94,6 +94,7 @@ void VariableDefinitionAST::Dump(uint32_t indentCount) const
 {
     INDENT(indentCount);
     printf("Variable Declaration (`%s`, `%u`)\n", name.c_str(), type->getTypeID());
+    initialValue->Dump(indentCount + 1);
 }
 
 void AssignmentStatementAST::Dump(uint32_t indentCount) const
@@ -258,6 +259,8 @@ void VariableDefinitionAST::Codegen() const
     auto parentFunction = g_Builder->GetInsertBlock()->getParent();
     llvm::IRBuilder<> functionBeginBuilder(&parentFunction->getEntryBlock(), parentFunction->getEntryBlock().begin());
     allocas[name] = functionBeginBuilder.CreateAlloca(type, nullptr, name);
+    if (initialValue != nullptr)
+        g_Builder->CreateStore(initialValue->Codegen(), allocas[name]);
 }
 
 void AssignmentStatementAST::Codegen() const

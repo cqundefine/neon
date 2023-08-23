@@ -101,7 +101,7 @@ struct VariableDefinitionAST : public StatementAST
     llvm::Type* type;
     std::shared_ptr<ExpressionAST> initialValue;
 
-    VariableDefinitionAST(const std::string& name, llvm::Type* type);
+    VariableDefinitionAST(const std::string& name, llvm::Type* type, std::shared_ptr<ExpressionAST> initialValue);
 
     virtual void Dump(uint32_t indentCount) const override;
     virtual void Codegen() const override;
