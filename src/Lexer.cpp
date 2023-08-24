@@ -2,7 +2,7 @@
 
 Token Lexer::NextToken() const
 {
-    static_assert(static_cast<uint32_t>(TokenType::_TokenTypeCount) == 20, "Not all tokens are handled in Lexer::NextToken()");
+    static_assert(static_cast<uint32_t>(TokenType::_TokenTypeCount) == 21, "Not all tokens are handled in Lexer::NextToken()");
 
     uint32_t beginIndex = m_index;
 
@@ -79,6 +79,44 @@ Token Lexer::NextToken() const
         }
 
         return { .type = TokenType::Equals, .length = m_index - beginIndex, .offset = m_index - 1 };
+    }
+    else if (g_context->fileContent[m_index] == '"')
+    {
+        uint32_t trueBeginIndex = m_index;
+        std::string value;
+        m_index++;
+        do {
+            char c = g_context->fileContent[m_index];
+            if (c == '\\')
+            {
+                m_index++;
+                if (g_context->fileContent[m_index] == 'n')
+                {
+                    value += 10;
+                }
+                else if (g_context->fileContent[m_index] == '\\')
+                {
+                    value += '\\';
+                }
+                else
+                {
+                    g_context->Error(m_index, "Unknown escape char: %c", g_context->fileContent[m_index]);
+                }
+            }
+            else
+            {
+                value += c;
+            }
+            m_index++;
+        } while(g_context->fileContent[m_index] != '"');
+        m_index++;
+
+        return { 
+            .type = TokenType::StringLiteral,
+            .stringValue = value,
+            .length = m_index - beginIndex,
+            .offset = trueBeginIndex
+        };
     }
 
     if (isdigit(g_context->fileContent[m_index]))

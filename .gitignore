@@ -1,4 +1,7 @@
 .vscode
 build
 *.o
+*.asm
+!helper.asm
+*.ir
 output*

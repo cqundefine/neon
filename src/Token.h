@@ -7,6 +7,7 @@ enum class TokenType
     // Generic
     Number,
     Identifier,
+    StringLiteral,
     Eof,
     
     // Symbols

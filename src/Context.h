@@ -25,10 +25,17 @@ struct Context
     enum class OutputFileType
     {
         Assembly,
-        Object
+        Object,
+        Executable
     };
 
     void Write(OutputFileType fileType);
+
+private:
+    void CreateSyscall0();
+    void CreateSyscall1();
+    void CreateSyscall2();
+    void CreateSyscall3();
 };
 
 extern Ref<Context> g_context;

@@ -2,6 +2,8 @@
 #include <Lexer.h>
 #include <Parser.h>
 
+#include <llvm/CodeGen/MachineInstr.h>
+
 int main(int argc, char** argv)
 {
     assert(argc == 3);
@@ -45,5 +47,10 @@ int main(int argc, char** argv)
     {
         parsedFile->Codegen();
         g_context->Write(Context::OutputFileType::Object);
+    }
+    else if (operation == "exe")
+    {
+        parsedFile->Codegen();
+        g_context->Write(Context::OutputFileType::Executable);
     }
 }

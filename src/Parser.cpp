@@ -15,11 +15,31 @@ std::shared_ptr<ParsedFile> Parser::Parse()
             auto nameToken = m_lexer.NextToken();
             assert(nameToken.type == TokenType::Identifier);
             ExpectToken(TokenType::LParen);
+
+            std::vector<FunctionAST::Param> params;
+
+            Token maybeName = m_lexer.NextToken();
+            while (maybeName.type == TokenType::Identifier)
+            {
+                ExpectToken(TokenType::Colon);
+                auto type = ParseType();
+
+                params.push_back({maybeName.stringValue, type});
+
+                Token maybeComma = m_lexer.NextToken();
+                if (maybeComma.type != TokenType::Comma)
+                    m_lexer.RollbackToken(maybeComma);
+
+                maybeName = m_lexer.NextToken();
+            }
+
+            m_lexer.RollbackToken(maybeName);
+
             ExpectToken(TokenType::RParen);
             ExpectToken(TokenType::Colon);
             ExpectToken(TokenType::Identifier);
             ExpectToken(TokenType::Semicolon);
-            functions.push_back(std::make_shared<FunctionAST>(nameToken.stringValue, nullptr));
+            functions.push_back(std::make_shared<FunctionAST>(nameToken.stringValue, params, nullptr));
         }
         else if (token.type == TokenType::Function)
         {
@@ -29,7 +49,8 @@ std::shared_ptr<ParsedFile> Parser::Parse()
             ExpectToken(TokenType::RParen);
             ExpectToken(TokenType::Colon);
             ExpectToken(TokenType::Identifier);
-            functions.push_back(std::make_shared<FunctionAST>(nameToken.stringValue, ParseBlock()));
+            std::vector<FunctionAST::Param> params;
+            functions.push_back(std::make_shared<FunctionAST>(nameToken.stringValue, params, ParseBlock()));
         }
         else if (token.type == TokenType::Eof)
         {
@@ -220,6 +241,10 @@ std::shared_ptr<ExpressionAST> Parser::ParsePrimary()
             return std::make_shared<VariableExpressionAST>(token.stringValue);
         }
     }
+    else if (token.type == TokenType::StringLiteral)
+    {
+        return std::make_shared<StringLiteralAST>(token.stringValue);
+    }
     else
     {
         g_context->Error(token.offset, "Unexpected token: %s", token.ToString().c_str());
@@ -251,18 +276,29 @@ BinaryOperation Parser::ParseOperation()
 
 llvm::Type* Parser::ParseType()
 {
-    Token type = m_lexer.NextToken();
-    assert(type.type == TokenType::Identifier);
-    if (type.stringValue == "int8" || type.stringValue == "uint8")
-        return reinterpret_cast<llvm::Type*>(llvm::Type::getInt8Ty(*g_context->llvmContext));
-    else if (type.stringValue == "int16" || type.stringValue == "uint16")
-        return reinterpret_cast<llvm::Type*>(llvm::Type::getInt16Ty(*g_context->llvmContext));
-    else if (type.stringValue == "int32" || type.stringValue == "uint32")
-        return reinterpret_cast<llvm::Type*>(llvm::Type::getInt32Ty(*g_context->llvmContext));
-    else if (type.stringValue == "int64" || type.stringValue == "uint64")
-        return reinterpret_cast<llvm::Type*>(llvm::Type::getInt64Ty(*g_context->llvmContext));
+    Token typeToken = m_lexer.NextToken();
+    assert(typeToken.type == TokenType::Identifier);
+    llvm::Type* type;
+    if (typeToken.stringValue == "int8" || typeToken.stringValue == "uint8")
+        type = reinterpret_cast<llvm::Type*>(llvm::Type::getInt8Ty(*g_context->llvmContext));
+    else if (typeToken.stringValue == "int16" || typeToken.stringValue == "uint16")
+        type = reinterpret_cast<llvm::Type*>(llvm::Type::getInt16Ty(*g_context->llvmContext));
+    else if (typeToken.stringValue == "int32" || typeToken.stringValue == "uint32")
+        type = reinterpret_cast<llvm::Type*>(llvm::Type::getInt32Ty(*g_context->llvmContext));
+    else if (typeToken.stringValue == "int64" || typeToken.stringValue == "uint64")
+        type = reinterpret_cast<llvm::Type*>(llvm::Type::getInt64Ty(*g_context->llvmContext));
     else
-        assert(false);
+        g_context->Error(typeToken.offset, "Unexpected token: %s", typeToken.ToString().c_str());
+
+    Token maybeStar = m_lexer.NextToken();
+    while (maybeStar.type == TokenType::Asterisk)
+    {
+        type = type->getPointerTo();
+        maybeStar = m_lexer.NextToken();
+    }
+    m_lexer.RollbackToken(maybeStar);
+
+    return type;
 }
 
 void Parser::ExpectToken(TokenType tokenType)

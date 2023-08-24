@@ -3,7 +3,7 @@
 
 std::string TokenTypeToString(TokenType tokenType)
 {
-    static_assert(static_cast<uint32_t>(TokenType::_TokenTypeCount) == 20, "Not all tokens are handled in Token::ToString()");
+    static_assert(static_cast<uint32_t>(TokenType::_TokenTypeCount) == 21, "Not all tokens are handled in Token::ToString()");
 
     switch (tokenType)
     {
@@ -11,6 +11,8 @@ std::string TokenTypeToString(TokenType tokenType)
             return "Number";
         case TokenType::Identifier:
             return "Identifier";
+        case TokenType::StringLiteral:
+            return "StringLiteral";
         case TokenType::Eof:
             return "Eof";
         case TokenType::LParen:
@@ -54,13 +56,15 @@ std::string TokenTypeToString(TokenType tokenType)
 
 std::string Token::ToString()
 {
-    static_assert(static_cast<uint32_t>(TokenType::_TokenTypeCount) == 20, "Not all tokens are handled in Token::ToString()");
+    static_assert(static_cast<uint32_t>(TokenType::_TokenTypeCount) == 21, "Not all tokens are handled in Token::ToString()");
     switch(type)
     {
         case TokenType::Number:
             return std::string("Number (`") + std::to_string(intValue) + "`)";
         case TokenType::Identifier:
             return std::string("Identifier (`") + stringValue + "`)";
+        case TokenType::StringLiteral:
+            return std::string("StringLiteral (`") + stringValue + "`)";
         case TokenType::Eof:
             return "EOF";
         case TokenType::LParen:

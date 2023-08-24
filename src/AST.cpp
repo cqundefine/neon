@@ -12,6 +12,7 @@
 
 NumberExpressionAST::NumberExpressionAST(uint64_t value) : value(value) {}
 VariableExpressionAST::VariableExpressionAST(const std::string& name) : name(name) {}
+StringLiteralAST::StringLiteralAST(const std::string& value) : value(value) {}
 BinaryExpressionAST::BinaryExpressionAST(std::shared_ptr<ExpressionAST> lhs, BinaryOperation binaryOperation, std::shared_ptr<ExpressionAST> rhs) : lhs(lhs), binaryOperation(binaryOperation), rhs(rhs) {}
 CallExpressionAST::CallExpressionAST(std::string calleeName, std::vector<std::shared_ptr<ExpressionAST>> args) : calleeName(calleeName), args(args) {}
 ReturnStatementAST::ReturnStatementAST(std::shared_ptr<ExpressionAST> value) : value(value) {}
@@ -19,7 +20,7 @@ BlockAST::BlockAST(const std::vector<ExpressionOrStatement>& statements) : state
 IfStatementAST::IfStatementAST(std::shared_ptr<ExpressionAST> condition, std::shared_ptr<BlockAST> block, std::shared_ptr<BlockAST> elseBlock) : condition(condition), block(block), elseBlock(elseBlock) {}
 VariableDefinitionAST::VariableDefinitionAST(const std::string& name, llvm::Type* type, std::shared_ptr<ExpressionAST> initialValue) : name(name), type(type), initialValue(initialValue) {}
 AssignmentStatementAST::AssignmentStatementAST(std::string name, std::shared_ptr<ExpressionAST> value) : name(name), value(value) {}
-FunctionAST::FunctionAST(const std::string& name, std::shared_ptr<BlockAST> block) : name(name), block(block) {}
+FunctionAST::FunctionAST(const std::string& name, std::vector<Param> params, std::shared_ptr<BlockAST> block) : name(name), params(params), block(block) {}
 ParsedFile::ParsedFile(const std::vector<std::shared_ptr<FunctionAST>>& functions) : functions(functions) {}
 
 // -------------------------
@@ -40,6 +41,12 @@ void VariableExpressionAST::Dump(uint32_t indentCount) const
 {
     INDENT(indentCount);
     printf("Variable Expression (`%s`)\n", name.c_str());
+}
+
+void StringLiteralAST::Dump(uint32_t indentCount) const
+{
+    INDENT(indentCount);
+    printf("String Literal (`%s`)\n", value.c_str());
 }
 
 void BinaryExpressionAST::Dump(uint32_t indentCount) const
@@ -109,6 +116,11 @@ void FunctionAST::Dump(uint32_t indentCount) const
 {
     INDENT(indentCount);
     printf("Function (`%s`)\n", name.c_str());
+    for (const auto& param : params)
+    {
+        INDENT(indentCount + 1);
+        printf("Param ('%s', '%u')\n", param.name.c_str(), param.type->getTypeID());
+    }
     if (block != nullptr)
         block->Dump(indentCount + 1);
 }
@@ -167,6 +179,16 @@ llvm::Value* NumberExpressionAST::Codegen() const
 llvm::Value* VariableExpressionAST::Codegen() const
 {
     return g_context->builder->CreateLoad(allocas[name]->getAllocatedType(), allocas[name], name);
+}
+
+llvm::Value* StringLiteralAST::Codegen() const
+{
+    std::vector<llvm::Constant *> chars(value.size());
+    for(unsigned int i = 0; i < value.size(); i++)
+        chars[i] = llvm::ConstantInt::get(*g_context->llvmContext, llvm::APInt(8, value[i], true));
+    auto init = llvm::ConstantArray::get(llvm::ArrayType::get(llvm::Type::getInt8Ty(*g_context->llvmContext), chars.size()), chars);
+    llvm::GlobalVariable * v = new llvm::GlobalVariable(*g_context->module, init->getType(), true, llvm::GlobalVariable::ExternalLinkage, init, value);
+    return llvm::ConstantExpr::getBitCast(v, llvm::Type::getInt8PtrTy(*g_context->llvmContext));
 }
 
 llvm::Value* BinaryExpressionAST::Codegen() const
@@ -266,7 +288,11 @@ void AssignmentStatementAST::Codegen() const
 
 llvm::Function* FunctionAST::Codegen() const
 {
-    auto functionType = llvm::FunctionType::get(llvm::Type::getInt32Ty(*g_context->llvmContext), false);
+    std::vector<llvm::Type*> llvmParams;
+    for (const auto& param : params)
+        llvmParams.push_back(param.type);
+
+    auto functionType = llvm::FunctionType::get(llvm::Type::getInt32Ty(*g_context->llvmContext), llvmParams, false);
     auto function = llvm::Function::Create(functionType, llvm::Function::ExternalLinkage, name, g_context->module.get());
     
     if (block != nullptr)
@@ -278,7 +304,7 @@ llvm::Function* FunctionAST::Codegen() const
 
         llvm::verifyFunction(*function);
 
-        g_context->functionPassManager->run(*function);
+        //g_context->functionPassManager->run(*function);
     }
 
     return function;

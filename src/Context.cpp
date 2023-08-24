@@ -1,6 +1,7 @@
 #include <Context.h>
 
 #include <filesystem>
+#include <llvm/IR/InlineAsm.h>
 #include <llvm/MC/TargetRegistry.h>
 #include <llvm/Support/FileSystem.h>
 #include <llvm/Support/TargetSelect.h>
@@ -49,6 +50,11 @@ Context::Context()
 
     module->setDataLayout(targetMachine->createDataLayout());
     module->setTargetTriple(targetTriple);
+
+    CreateSyscall0();
+    CreateSyscall1();
+    CreateSyscall2();
+    CreateSyscall3();
 }
 
 std::pair<uint32_t, uint32_t> Context::LineColumnFromOffset(uint32_t offset)
@@ -113,4 +119,85 @@ void Context::Write(OutputFileType fileType)
 
     pass.run(*g_context->module);
     outputStream.flush();
+
+    if (fileType == OutputFileType::Executable)
+    {
+        system((std::string("gcc ") + outputFilename + " -o " + sourceFilenameWithoutExtension).c_str());
+    }
+}
+
+void Context::CreateSyscall0()
+{
+    auto int64Type = llvm::Type::getInt64Ty(*llvmContext);
+
+    auto functionType = llvm::FunctionType::get(int64Type, {int64Type}, false);
+    auto function = llvm::Function::Create(functionType, llvm::Function::LinkageTypes::ExternalLinkage, "syscall0", *module);
+
+    std::vector<llvm::Value*> args;
+    for (auto& arg : function->args())
+        args.push_back(&arg);
+
+    auto block = llvm::BasicBlock::Create(*llvmContext, "entry", function);
+    builder->SetInsertPoint(block);
+
+    auto asmcall = llvm::InlineAsm::get(functionType, "syscall", "={ax},{ax},~{memory},~{dirflag},~{fpsr},~{flags}", true, true, llvm::InlineAsm::AsmDialect::AD_Intel, false);
+    auto result = builder->CreateCall(asmcall, args);
+    builder->CreateRet(result);
+}
+
+void Context::CreateSyscall1()
+{
+    auto int64Type = llvm::Type::getInt64Ty(*llvmContext);
+
+    auto functionType = llvm::FunctionType::get(int64Type, {int64Type, int64Type}, false);
+    auto function = llvm::Function::Create(functionType, llvm::Function::LinkageTypes::ExternalLinkage, "syscall1", *module);
+
+    std::vector<llvm::Value*> args;
+    for (auto& arg : function->args())
+        args.push_back(&arg);
+
+    auto block = llvm::BasicBlock::Create(*llvmContext, "entry", function);
+    builder->SetInsertPoint(block);
+
+    auto asmcall = llvm::InlineAsm::get(functionType, "syscall", "={ax},{ax},{di},~{memory},~{dirflag},~{fpsr},~{flags}", true, true, llvm::InlineAsm::AsmDialect::AD_Intel, false);
+    auto result = builder->CreateCall(asmcall, args);
+    builder->CreateRet(result);
+}
+
+void Context::CreateSyscall2()
+{
+    auto int64Type = llvm::Type::getInt64Ty(*llvmContext);
+
+    auto functionType = llvm::FunctionType::get(int64Type, {int64Type, int64Type, int64Type}, false);
+    auto function = llvm::Function::Create(functionType, llvm::Function::LinkageTypes::ExternalLinkage, "syscall2", *module);
+
+    std::vector<llvm::Value*> args;
+    for (auto& arg : function->args())
+        args.push_back(&arg);
+
+    auto block = llvm::BasicBlock::Create(*llvmContext, "entry", function);
+    builder->SetInsertPoint(block);
+
+    auto asmcall = llvm::InlineAsm::get(functionType, "syscall", "={ax},{ax},{di},{si},~{memory},~{dirflag},~{fpsr},~{flags}", true, true, llvm::InlineAsm::AsmDialect::AD_Intel, false);
+    auto result = builder->CreateCall(asmcall, args);
+    builder->CreateRet(result);
+}
+
+void Context::CreateSyscall3()
+{
+    auto int64Type = llvm::Type::getInt64Ty(*llvmContext);
+
+    auto functionType = llvm::FunctionType::get(int64Type, {int64Type, int64Type, int64Type, int64Type}, false);
+    auto function = llvm::Function::Create(functionType, llvm::Function::LinkageTypes::ExternalLinkage, "syscall3", *module);
+
+    std::vector<llvm::Value*> args;
+    for (auto& arg : function->args())
+        args.push_back(&arg);
+
+    auto block = llvm::BasicBlock::Create(*llvmContext, "entry", function);
+    builder->SetInsertPoint(block);
+
+    auto asmcall = llvm::InlineAsm::get(functionType, "syscall", "={ax},{ax},{di},{si},{dx},~{memory},~{dirflag},~{fpsr},~{flags}", true, true, llvm::InlineAsm::AsmDialect::AD_Intel, false);
+    auto result = builder->CreateCall(asmcall, args);
+    builder->CreateRet(result);
 }

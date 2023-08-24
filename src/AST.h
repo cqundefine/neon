@@ -34,6 +34,16 @@ struct VariableExpressionAST : public ExpressionAST
     virtual llvm::Value* Codegen() const override;
 };
 
+struct StringLiteralAST : public ExpressionAST
+{
+    std::string value;
+
+    StringLiteralAST(const std::string& value);
+
+    virtual void Dump(uint32_t indentCount) const override;
+    virtual llvm::Value* Codegen() const override;
+};
+
 struct BinaryExpressionAST : public ExpressionAST
 {
     std::shared_ptr<ExpressionAST> lhs;
@@ -120,10 +130,17 @@ struct AssignmentStatementAST : public StatementAST
 
 struct FunctionAST
 {
+    struct Param
+    {
+        std::string name;
+        llvm::Type* type;
+    };
+
     std::string name;
+    std::vector<Param> params;
     std::shared_ptr<BlockAST> block;
 
-    FunctionAST(const std::string& name, std::shared_ptr<BlockAST> block);
+    FunctionAST(const std::string& name, std::vector<Param> params, std::shared_ptr<BlockAST> block);
     
     void Dump(uint32_t indentCount) const;
     llvm::Function* Codegen() const;
