@@ -20,7 +20,7 @@ BlockAST::BlockAST(const std::vector<ExpressionOrStatement>& statements) : state
 IfStatementAST::IfStatementAST(std::shared_ptr<ExpressionAST> condition, std::shared_ptr<BlockAST> block, std::shared_ptr<BlockAST> elseBlock) : condition(condition), block(block), elseBlock(elseBlock) {}
 VariableDefinitionAST::VariableDefinitionAST(const std::string& name, llvm::Type* type, std::shared_ptr<ExpressionAST> initialValue) : name(name), type(type), initialValue(initialValue) {}
 AssignmentStatementAST::AssignmentStatementAST(std::string name, std::shared_ptr<ExpressionAST> value) : name(name), value(value) {}
-FunctionAST::FunctionAST(const std::string& name, std::vector<Param> params, std::shared_ptr<BlockAST> block) : name(name), params(params), block(block) {}
+FunctionAST::FunctionAST(const std::string& name, std::vector<Param> params, llvm::Type* returnType, std::shared_ptr<BlockAST> block) : name(name), params(params), returnType(returnType), block(block) {}
 ParsedFile::ParsedFile(const std::vector<std::shared_ptr<FunctionAST>>& functions) : functions(functions) {}
 
 // -------------------------

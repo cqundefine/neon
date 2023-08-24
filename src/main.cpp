@@ -53,4 +53,9 @@ int main(int argc, char** argv)
         parsedFile->Codegen();
         g_context->Write(Context::OutputFileType::Executable);
     }
+    else if (operation == "exe-r")
+    {
+        parsedFile->Codegen();
+        g_context->Write(Context::OutputFileType::ExecutableRun);
+    }
 }

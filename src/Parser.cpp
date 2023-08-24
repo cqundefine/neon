@@ -39,7 +39,7 @@ std::shared_ptr<ParsedFile> Parser::Parse()
             ExpectToken(TokenType::Colon);
             ExpectToken(TokenType::Identifier);
             ExpectToken(TokenType::Semicolon);
-            functions.push_back(std::make_shared<FunctionAST>(nameToken.stringValue, params, nullptr));
+            functions.push_back(std::make_shared<FunctionAST>(nameToken.stringValue, params, llvm::Type::getInt32Ty(*g_context->llvmContext), nullptr));
         }
         else if (token.type == TokenType::Function)
         {
@@ -50,7 +50,7 @@ std::shared_ptr<ParsedFile> Parser::Parse()
             ExpectToken(TokenType::Colon);
             ExpectToken(TokenType::Identifier);
             std::vector<FunctionAST::Param> params;
-            functions.push_back(std::make_shared<FunctionAST>(nameToken.stringValue, params, ParseBlock()));
+            functions.push_back(std::make_shared<FunctionAST>(nameToken.stringValue, params, llvm::Type::getInt32Ty(*g_context->llvmContext), ParseBlock()));
         }
         else if (token.type == TokenType::Eof)
         {

@@ -5,3 +5,7 @@ build
 !helper.asm
 *.ir
 output*
+
+tests/*
+!tests/*.ne
+!tests/*.txt

@@ -138,9 +138,10 @@ struct FunctionAST
 
     std::string name;
     std::vector<Param> params;
+    llvm::Type* returnType;
     std::shared_ptr<BlockAST> block;
 
-    FunctionAST(const std::string& name, std::vector<Param> params, std::shared_ptr<BlockAST> block);
+    FunctionAST(const std::string& name, std::vector<Param> params, llvm::Type* returnType, std::shared_ptr<BlockAST> block);
     
     void Dump(uint32_t indentCount) const;
     llvm::Function* Codegen() const;

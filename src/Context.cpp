@@ -96,8 +96,7 @@ std::pair<uint32_t, uint32_t> Context::LineColumnFromOffset(uint32_t offset)
 
 void Context::Write(OutputFileType fileType)
 {
-    auto sourceFilename = filename.substr(filename.find_last_of("/\\") + 1);
-    auto sourceFilenameWithoutExtension = sourceFilename.substr(0, sourceFilename.length() - sourceFilename.substr(sourceFilename.find_last_of('.') + 1).length() - 1);
+    auto sourceFilenameWithoutExtension = filename.substr(0, filename.length() - filename.substr(filename.find_last_of('.') + 1).length() - 1);
     auto outputFilename = fileType == OutputFileType::Assembly ? sourceFilenameWithoutExtension + ".asm" : sourceFilenameWithoutExtension + ".o";
 
     std::error_code errorCode;
@@ -120,9 +119,14 @@ void Context::Write(OutputFileType fileType)
     pass.run(*g_context->module);
     outputStream.flush();
 
-    if (fileType == OutputFileType::Executable)
+    if (fileType == OutputFileType::Executable || fileType == OutputFileType::ExecutableRun)
     {
         system((std::string("gcc ") + outputFilename + " -o " + sourceFilenameWithoutExtension).c_str());
+    }
+
+    if (fileType == OutputFileType::ExecutableRun)
+    {
+        system((std::string("./") + sourceFilenameWithoutExtension).c_str());
     }
 }
 

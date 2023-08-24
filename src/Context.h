@@ -26,7 +26,8 @@ struct Context
     {
         Assembly,
         Object,
-        Executable
+        Executable,
+        ExecutableRun
     };
 
     void Write(OutputFileType fileType);
