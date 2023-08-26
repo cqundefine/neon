@@ -189,6 +189,7 @@ std::shared_ptr<ExpressionAST> Parser::ParseExpression()
 
         auto right_side = ParsePrimary();
 
+        if (parenCount > 0)
         {
             Token token = m_lexer.NextToken();
             while(token.type == TokenType::RParen)
@@ -227,6 +228,7 @@ std::shared_ptr<ExpressionAST> Parser::ParseExpression()
         lastPrecedence = precedence;
     }
 
+    if (parenCount > 0)
     {
         Token token = m_lexer.NextToken();
         while(token.type == TokenType::RParen)

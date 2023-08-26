@@ -116,19 +116,23 @@ def run_test_for_file(file_path: str, stats: RunStats = RunStats()):
 
     if tc is not None:
         comp = cmd_run_echoed(["build/Neon", file_path, "exe", *tc.argv], input=tc.stdin, capture_output=True)
-        com = cmd_run_echoed([file_path[:-len(NEON_EXT)]], input=tc.stdin, capture_output=True)
-        if com.returncode != tc.returncode or com.stdout != tc.stdout or com.stderr != tc.stderr:
-            print("[ERROR] Unexpected output")
-            print("  Expected:")
-            print("    return code: %s" % tc.returncode)
-            print("    stdout: \n%s" % tc.stdout.decode("utf-8"))
-            print("    stderr: \n%s" % tc.stderr.decode("utf-8"))
-            print("  Actual:")
-            print("    return code: %s" % com.returncode)
-            print("    stdout: \n%s" % com.stdout.decode("utf-8"))
-            print("    stderr: \n%s" % com.stderr.decode("utf-8"))
+        if comp.returncode != 0:
             error = True
             stats.failed += 1
+        else:
+            com = cmd_run_echoed([file_path[:-len(NEON_EXT)]], input=tc.stdin, capture_output=True)
+            if com.returncode != tc.returncode or com.stdout != tc.stdout or com.stderr != tc.stderr:
+                print("[ERROR] Unexpected output")
+                print("  Expected:")
+                print("    return code: %s" % tc.returncode)
+                print("    stdout: \n%s" % tc.stdout.decode("utf-8"))
+                print("    stderr: \n%s" % tc.stderr.decode("utf-8"))
+                print("  Actual:")
+                print("    return code: %s" % com.returncode)
+                print("    stdout: \n%s" % com.stdout.decode("utf-8"))
+                print("    stderr: \n%s" % com.stderr.decode("utf-8"))
+                error = True
+                stats.failed += 1
 
     else:
         print('[WARNING] Could not find any input/output data for %s. Ignoring testing. Only checking if it compiles.' % file_path)

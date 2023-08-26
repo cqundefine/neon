@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.20)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-find_package(LLVM 15 REQUIRED CONFIG)
+find_package(LLVM REQUIRED CONFIG)
 
 project(Neon)
 
