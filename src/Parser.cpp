@@ -151,8 +151,20 @@ ExpressionOrStatement Parser::ParseStatement()
 std::shared_ptr<ExpressionAST> Parser::ParseExpression()
 {
     std::stack<std::shared_ptr<ExpressionAST>> expressionStack;
-    std::stack<BinaryOperation> operationStack;
+    std::stack<std::pair<BinaryOperation, int>> operationStack;
     int lastPrecedence = INT32_MAX;
+
+    int parenCount = 0;
+
+    {
+        Token token = m_lexer.NextToken();
+        while(token.type == TokenType::LParen)
+        {
+            parenCount++;
+            token = m_lexer.NextToken();
+        }
+        m_lexer.RollbackToken(token);
+    }
 
     auto leftSide = ParsePrimary();
     expressionStack.push(leftSide);
@@ -163,9 +175,29 @@ std::shared_ptr<ExpressionAST> Parser::ParseExpression()
         if(operation == BinaryOperation::_BinaryOperationCount)
             break;
 
-        int precedence = BinaryOperationPrecedence[operation];
+        int precedence = BinaryOperationPrecedence[operation] + parenCount * 1000;
+
+        {
+            Token token = m_lexer.NextToken();
+            while(token.type == TokenType::LParen)
+            {
+                parenCount++;
+                token = m_lexer.NextToken();
+            }
+            m_lexer.RollbackToken(token);
+        }
 
         auto right_side = ParsePrimary();
+
+        {
+            Token token = m_lexer.NextToken();
+            while(token.type == TokenType::RParen)
+            {
+                parenCount--;
+                token = m_lexer.NextToken();
+            }
+            m_lexer.RollbackToken(token);
+        }
 
         while (precedence <= lastPrecedence && expressionStack.size() > 1)
         {
@@ -174,7 +206,7 @@ std::shared_ptr<ExpressionAST> Parser::ParseExpression()
             auto operator2 = operationStack.top();
             operationStack.pop();
 
-            lastPrecedence = BinaryOperationPrecedence[operator2];
+            lastPrecedence = operator2.second;
 
             if (lastPrecedence < precedence)
             {
@@ -186,13 +218,23 @@ std::shared_ptr<ExpressionAST> Parser::ParseExpression()
             auto leftSide2 = expressionStack.top();
             expressionStack.pop();
 
-            expressionStack.push(std::make_shared<BinaryExpressionAST>(leftSide2, operator2, rightSide2));
+            expressionStack.push(std::make_shared<BinaryExpressionAST>(leftSide2, operator2.first, rightSide2));
         }
 
-        operationStack.push(operation);
+        operationStack.push({ operation, precedence });
         expressionStack.push(right_side);
 
         lastPrecedence = precedence;
+    }
+
+    {
+        Token token = m_lexer.NextToken();
+        while(token.type == TokenType::RParen)
+        {
+            parenCount--;
+            token = m_lexer.NextToken();
+        }
+        m_lexer.RollbackToken(token);
     }
 
     while (expressionStack.size() != 1)
@@ -204,7 +246,7 @@ std::shared_ptr<ExpressionAST> Parser::ParseExpression()
         auto leftSide2 = expressionStack.top();
         expressionStack.pop();
 
-        expressionStack.push(std::make_shared<BinaryExpressionAST>(leftSide2, operator2, rightSide2));
+        expressionStack.push(std::make_shared<BinaryExpressionAST>(leftSide2, operator2.first, rightSide2));
     }
 
     return expressionStack.top();
