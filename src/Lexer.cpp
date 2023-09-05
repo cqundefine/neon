@@ -7,12 +7,14 @@ Token Lexer::NextToken() const
     uint32_t beginIndex = m_index;
 
     if (m_index >= g_context->fileContent.size())
-        return {
-            .type = TokenType::Eof
-        };
+        return { .type = TokenType::Eof };
     
     while(g_context->fileContent[m_index] == ' ' || g_context->fileContent[m_index] == '\t' || g_context->fileContent[m_index] == '\n' || g_context->fileContent[m_index] == '\r')
+    {
         m_index++;
+        if (m_index >= g_context->fileContent.size())
+            return { .type = TokenType::Eof };
+    }
 
     if (g_context->fileContent[m_index] == '(')
     {

@@ -5,6 +5,7 @@
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/LegacyPassManager.h>
 #include <llvm/IR/Verifier.h>
+#include <regex>
 
 // -------------------------
 // Constructors
@@ -46,7 +47,7 @@ void VariableExpressionAST::Dump(uint32_t indentCount) const
 void StringLiteralAST::Dump(uint32_t indentCount) const
 {
     INDENT(indentCount);
-    printf("String Literal (`%s`)\n", value.c_str());
+    printf("String Literal (`%s`)\n", std::regex_replace(std::regex_replace(value, std::regex("\n"), "\\n"), std::regex("\\"), "\\\\").c_str());
 }
 
 void BinaryExpressionAST::Dump(uint32_t indentCount) const
