@@ -3,7 +3,7 @@
 
 std::string TokenTypeToString(TokenType tokenType)
 {
-    static_assert(static_cast<uint32_t>(TokenType::_TokenTypeCount) == 21, "Not all tokens are handled in Token::ToString()");
+    static_assert(static_cast<uint32_t>(TokenType::_TokenTypeCount) == 24, "Not all tokens are handled in Token::ToString()");
 
     switch (tokenType)
     {
@@ -41,6 +41,10 @@ std::string TokenTypeToString(TokenType tokenType)
             return "Equals";
         case TokenType::DoubleEquals:
             return "DoubleEquals";
+        case TokenType::GreaterThan:
+            return "GreaterThan";
+        case TokenType::LessThan:
+            return "LessThan";
         case TokenType::Function:
             return "Function";
         case TokenType::Return:
@@ -49,6 +53,8 @@ std::string TokenTypeToString(TokenType tokenType)
             return "If";
         case TokenType::Extern:
             return "Extern";
+        case TokenType::While:
+            return "While";
         default:
             assert(false);
     }
@@ -56,7 +62,7 @@ std::string TokenTypeToString(TokenType tokenType)
 
 std::string Token::ToString()
 {
-    static_assert(static_cast<uint32_t>(TokenType::_TokenTypeCount) == 21, "Not all tokens are handled in Token::ToString()");
+    static_assert(static_cast<uint32_t>(TokenType::_TokenTypeCount) == 24, "Not all tokens are handled in Token::ToString()");
     switch(type)
     {
         case TokenType::Number:
@@ -93,6 +99,10 @@ std::string Token::ToString()
             return "Equals (`=`)";
         case TokenType::DoubleEquals:
             return "DoubleEquals (`==`)";
+        case TokenType::GreaterThan:
+            return "GreaterThan (`>`)";
+        case TokenType::LessThan:
+            return "LessThan (`<`)";
         case TokenType::Function:
             return "Function (`function`)";
         case TokenType::Return:
@@ -101,6 +111,8 @@ std::string Token::ToString()
             return "If (`if`)";
         case TokenType::Extern:
             return "Extern (`extern`)";
+        case TokenType::While:
+            return "While (`while`)";
         default:
             return "Invalid";
     }

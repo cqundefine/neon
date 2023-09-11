@@ -8,7 +8,9 @@ project(Neon)
 
 include_directories(src)
 
-file(GLOB_RECURSE SOURCES src/*.cpp)
+add_compile_options(-fdiagnostics-color=always)
+
+file(GLOB_RECURSE SOURCES src/*.cpp src/AST/*.cpp)
 add_executable(Neon ${SOURCES})
 
 include_directories(${LLVM_INCLUDE_DIRS})

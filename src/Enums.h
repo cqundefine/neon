@@ -26,6 +26,7 @@ enum class BinaryOperation
     Multiply,
     Divide,
     Equals,
+    GreaterThan,
 
     _BinaryOperationCount
 };

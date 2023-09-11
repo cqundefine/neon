@@ -136,7 +136,7 @@ def run_test_for_file(file_path: str, stats: RunStats = RunStats()):
 
     else:
         print('[WARNING] Could not find any input/output data for %s. Ignoring testing. Only checking if it compiles.' % file_path)
-        com = cmd_run_echoed(["build/Neon", "exe", file_path])
+        com = cmd_run_echoed(["build/Neon", file_path, "exe"])
         if com.returncode != 0:
             error = True
             stats.failed += 1

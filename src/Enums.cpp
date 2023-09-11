@@ -28,18 +28,19 @@ std::string NumberTypeToString(NumberType numberType)
     }
 }
 
-static_assert(static_cast<uint32_t>(BinaryOperation::_BinaryOperationCount) == 5, "Not all binary operations are in BinaryOperationPrecedence");
+static_assert(static_cast<uint32_t>(BinaryOperation::_BinaryOperationCount) == 6, "Not all binary operations are in BinaryOperationPrecedence");
 std::map<BinaryOperation, int> BinaryOperationPrecedence = {
     {BinaryOperation::Add, 20},
     {BinaryOperation::Subtract, 20},
     {BinaryOperation::Multiply, 30},
     {BinaryOperation::Divide, 30},
-    {BinaryOperation::Equals, 10}
+    {BinaryOperation::Equals, 10},
+    {BinaryOperation::GreaterThan, 10}
 };
 
 std::string BinaryOperationToString(BinaryOperation binaryOperation)
 {
-    static_assert(static_cast<uint32_t>(BinaryOperation::_BinaryOperationCount) == 5, "Not all binary operations are handled in BinaryOperationToString()");
+    static_assert(static_cast<uint32_t>(BinaryOperation::_BinaryOperationCount) == 6, "Not all binary operations are handled in BinaryOperationToString()");
 
     switch(binaryOperation)
     {
@@ -53,6 +54,8 @@ std::string BinaryOperationToString(BinaryOperation binaryOperation)
             return "Divide (`/`)";
         case BinaryOperation::Equals:
             return "Equals (`==`)";
+        case BinaryOperation::GreaterThan:
+            return "GreaterThan (`>`)";
         default:
             assert(false);
     }

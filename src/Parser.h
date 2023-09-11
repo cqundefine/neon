@@ -8,7 +8,7 @@
 class Parser
 {
 public:
-    Parser(const Lexer& lexer);
+    inline explicit Parser(const Lexer& lexer) : m_lexer(lexer) {}
 
     std::shared_ptr<ParsedFile> Parse();
 

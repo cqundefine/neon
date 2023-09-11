@@ -7,21 +7,39 @@
 // FIXME: Use typedef or using ... = ...
 #define ExpressionOrStatement std::variant<std::shared_ptr<StatementAST>, std::shared_ptr<ExpressionAST>>
 
+enum class ExpressionType
+{
+    Number,
+    Variable,
+    StringLiteral,
+    Binary,
+    Call,
+    Cast
+};
+
 struct ExpressionAST
 {
+    ExpressionType type;
+
+    ExpressionAST(ExpressionType type);
+
     virtual void Dump(uint32_t indentCount) const = 0;
     virtual llvm::Value* Codegen() const = 0;
+    virtual void Typecheck() const = 0;
 };
 
 struct NumberExpressionAST : public ExpressionAST
 {
     uint64_t value;
-    NumberType type = NumberType::Int32;
+    NumberType type;
 
-    NumberExpressionAST(uint64_t value);
+    NumberExpressionAST(uint64_t value, NumberType type);
+
+    void AdjustTypeToBits(uint32_t bits);
 
     virtual void Dump(uint32_t indentCount) const override;
     virtual llvm::Value* Codegen() const override;
+    virtual void Typecheck() const override;
 };
 
 struct VariableExpressionAST : public ExpressionAST
@@ -32,6 +50,7 @@ struct VariableExpressionAST : public ExpressionAST
 
     virtual void Dump(uint32_t indentCount) const override;
     virtual llvm::Value* Codegen() const override;
+    virtual void Typecheck() const override;
 };
 
 struct StringLiteralAST : public ExpressionAST
@@ -42,6 +61,7 @@ struct StringLiteralAST : public ExpressionAST
 
     virtual void Dump(uint32_t indentCount) const override;
     virtual llvm::Value* Codegen() const override;
+    virtual void Typecheck() const override;
 };
 
 struct BinaryExpressionAST : public ExpressionAST
@@ -54,6 +74,7 @@ struct BinaryExpressionAST : public ExpressionAST
 
     virtual void Dump(uint32_t indentCount) const override;
     virtual llvm::Value* Codegen() const override;
+    virtual void Typecheck() const override;
 };
 
 struct CallExpressionAST : public ExpressionAST
@@ -65,12 +86,26 @@ struct CallExpressionAST : public ExpressionAST
     
     virtual void Dump(uint32_t indentCount) const override;
     virtual llvm::Value* Codegen() const override;
+    virtual void Typecheck() const override;
+};
+
+struct CastExpressionAST : public ExpressionAST
+{
+    llvm::Type* castedTo;
+    std::shared_ptr<ExpressionAST> child;
+
+    CastExpressionAST(llvm::Type* castedTo, std::shared_ptr<ExpressionAST> child);
+    
+    virtual void Dump(uint32_t indentCount) const override;
+    virtual llvm::Value* Codegen() const override;
+    virtual void Typecheck() const override;
 };
 
 struct StatementAST
 {
     virtual void Dump(uint32_t indentCount) const = 0;
     virtual void Codegen() const = 0;
+    virtual void Typecheck() const = 0;
 };
 
 struct ReturnStatementAST : public StatementAST
@@ -81,6 +116,7 @@ struct ReturnStatementAST : public StatementAST
     
     virtual void Dump(uint32_t indentCount) const override;
     virtual void Codegen() const override;
+    virtual void Typecheck() const override;
 };
 
 struct BlockAST
@@ -91,6 +127,7 @@ struct BlockAST
     
     void Dump(uint32_t indentCount) const;
     void Codegen() const;
+    void Typecheck() const;
 };
 
 struct IfStatementAST : public StatementAST
@@ -103,6 +140,19 @@ struct IfStatementAST : public StatementAST
     
     virtual void Dump(uint32_t indentCount) const override;
     virtual void Codegen() const override;
+    virtual void Typecheck() const override;
+};
+
+struct WhileStatementAST : public StatementAST
+{
+    std::shared_ptr<ExpressionAST> condition;
+    std::shared_ptr<BlockAST> block;
+
+    WhileStatementAST(std::shared_ptr<ExpressionAST> condition, std::shared_ptr<BlockAST> block);
+    
+    virtual void Dump(uint32_t indentCount) const override;
+    virtual void Codegen() const override;
+    virtual void Typecheck() const override;
 };
 
 struct VariableDefinitionAST : public StatementAST
@@ -115,6 +165,7 @@ struct VariableDefinitionAST : public StatementAST
 
     virtual void Dump(uint32_t indentCount) const override;
     virtual void Codegen() const override;
+    virtual void Typecheck() const override;
 };
 
 struct AssignmentStatementAST : public StatementAST
@@ -126,6 +177,7 @@ struct AssignmentStatementAST : public StatementAST
 
     virtual void Dump(uint32_t indentCount) const override;
     virtual void Codegen() const override;
+    virtual void Typecheck() const override;
 };
 
 struct FunctionAST
@@ -145,6 +197,7 @@ struct FunctionAST
     
     void Dump(uint32_t indentCount) const;
     llvm::Function* Codegen() const;
+    void Typecheck() const;
 };
 
 struct ParsedFile
@@ -155,4 +208,5 @@ struct ParsedFile
 
     void Dump(uint32_t indentCount = 0) const;
     void Codegen() const;
+    void Typecheck() const;
 };

@@ -24,12 +24,15 @@ enum class TokenType
     Comma,
     Equals,
     DoubleEquals,
+    GreaterThan,
+    LessThan,
 
     // Keywords
     Function,
     Return,
     If,
     Extern,
+    While,
 
     _TokenTypeCount
 };

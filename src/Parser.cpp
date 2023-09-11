@@ -1,8 +1,6 @@
 #include <Parser.h>
 #include <stack>
 
-Parser::Parser(const Lexer& lexer) : m_lexer(lexer) {}
-
 std::shared_ptr<ParsedFile> Parser::Parse()
 {
     std::vector<std::shared_ptr<FunctionAST>> functions;
@@ -105,6 +103,12 @@ ExpressionOrStatement Parser::ParseStatement()
             m_lexer.RollbackToken(else_);
         }
         return std::make_shared<IfStatementAST>(condition, block, nullptr);
+    }
+    else if (token.type == TokenType::While)
+    {
+        auto condition = ParseExpression();
+        auto block = ParseBlock();
+        return std::make_shared<WhileStatementAST>(condition, block);
     }
     else if (token.type == TokenType::Identifier)
     {
@@ -259,7 +263,7 @@ std::shared_ptr<ExpressionAST> Parser::ParsePrimary()
     Token token = m_lexer.NextToken();
     if (token.type == TokenType::Number)
     {
-        return std::make_shared<NumberExpressionAST>(token.intValue);
+        return std::make_shared<NumberExpressionAST>(token.intValue, NumberType::Int32);
     }
     else if(token.type == TokenType::Identifier)
     {
@@ -279,6 +283,15 @@ std::shared_ptr<ExpressionAST> Parser::ParsePrimary()
             }
             return std::make_shared<CallExpressionAST>(token.stringValue, args);
         }
+        else if (paren.type == TokenType::LessThan)
+        {
+            auto type = ParseType();
+            ExpectToken(TokenType::GreaterThan);
+            ExpectToken(TokenType::LParen);
+            auto child = ParseExpression();
+            ExpectToken(TokenType::RParen);
+            return std::make_shared<CastExpressionAST>(type, child);
+        }
         else
         {
             m_lexer.RollbackToken(paren);
@@ -297,24 +310,26 @@ std::shared_ptr<ExpressionAST> Parser::ParsePrimary()
 
 BinaryOperation Parser::ParseOperation()
 {
-    static_assert(static_cast<uint32_t>(BinaryOperation::_BinaryOperationCount) == 5, "Not all binary operations are handled in Parser::ParseOperation()");
+    static_assert(static_cast<uint32_t>(BinaryOperation::_BinaryOperationCount) == 6, "Not all binary operations are handled in Parser::ParseOperation()");
     
     Token token = m_lexer.NextToken();
     switch (token.type)
     {
-    case TokenType::Plus:
-        return BinaryOperation::Add;
-    case TokenType::Minus:
-        return BinaryOperation::Subtract;
-    case TokenType::Asterisk:
-        return BinaryOperation::Multiply;
-    case TokenType::Slash:
-        return BinaryOperation::Divide;
-    case TokenType::DoubleEquals:
-        return BinaryOperation::Equals;
-    default:
-        m_lexer.RollbackToken(token);
-        return BinaryOperation::_BinaryOperationCount;
+        case TokenType::Plus:
+            return BinaryOperation::Add;
+        case TokenType::Minus:
+            return BinaryOperation::Subtract;
+        case TokenType::Asterisk:
+            return BinaryOperation::Multiply;
+        case TokenType::Slash:
+            return BinaryOperation::Divide;
+        case TokenType::DoubleEquals:
+            return BinaryOperation::Equals;
+        case TokenType::GreaterThan:
+            return BinaryOperation::GreaterThan;
+        default:
+            m_lexer.RollbackToken(token);
+            return BinaryOperation::_BinaryOperationCount;
     }
 }
 

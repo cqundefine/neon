@@ -2,7 +2,7 @@
 
 Token Lexer::NextToken() const
 {
-    static_assert(static_cast<uint32_t>(TokenType::_TokenTypeCount) == 21, "Not all tokens are handled in Lexer::NextToken()");
+    static_assert(static_cast<uint32_t>(TokenType::_TokenTypeCount) == 24, "Not all tokens are handled in Lexer::NextToken()");
 
     uint32_t beginIndex = m_index;
 
@@ -82,6 +82,16 @@ Token Lexer::NextToken() const
 
         return { .type = TokenType::Equals, .length = m_index - beginIndex, .offset = m_index - 1 };
     }
+    else if (g_context->fileContent[m_index] == '>')
+    {
+        m_index++;
+        return { .type = TokenType::GreaterThan, .length = m_index - beginIndex, .offset = m_index - 1 };
+    }
+    else if (g_context->fileContent[m_index] == '<')
+    {
+        m_index++;
+        return { .type = TokenType::LessThan, .length = m_index - beginIndex, .offset = m_index - 1 };
+    }
     else if (g_context->fileContent[m_index] == '"')
     {
         uint32_t trueBeginIndex = m_index;
@@ -154,6 +164,8 @@ Token Lexer::NextToken() const
             return { .type = TokenType::If, .length = m_index - beginIndex, .offset = trueBeginIndex };
         else if (value == "extern")
             return { .type = TokenType::Extern, .length = m_index - beginIndex, .offset = trueBeginIndex };
+        else if (value == "while")
+            return { .type = TokenType::While, .length = m_index - beginIndex, .offset = trueBeginIndex };
         else
             return { 
                 .type = TokenType::Identifier,

@@ -28,6 +28,7 @@ int main(int argc, char** argv)
 
     Parser parser(lexer);
     auto parsedFile = parser.Parse();
+    parsedFile->Typecheck();
     
     if (operation == "ast")
     {
@@ -57,5 +58,9 @@ int main(int argc, char** argv)
     {
         parsedFile->Codegen();
         g_context->Write(Context::OutputFileType::ExecutableRun);
+    }
+    else
+    {
+        assert(false);
     }
 }
