@@ -10,6 +10,8 @@
 #include <llvm/Transforms/Scalar/GVN.h>
 #include <llvm/Transforms/Utils.h>
 #include <stdarg.h>
+#include <sys/prctl.h>
+#include <sys/wait.h>
 
 Ref<Context> g_context;
 
@@ -57,12 +59,12 @@ Context::Context()
     CreateSyscall3();
 }
 
-std::pair<uint32_t, uint32_t> Context::LineColumnFromOffset(uint32_t offset)
+std::pair<uint32_t, uint32_t> Context::LineColumnFromLocation(uint32_t location) const
 {
     uint32_t line = 1;
     uint32_t column = 1;
 
-    for (uint32_t index = 0; index <= offset; index++)
+    for (uint32_t index = 0; index <= location; index++)
     {
         if (fileContent[index] == '\n')
         {
@@ -78,10 +80,10 @@ std::pair<uint32_t, uint32_t> Context::LineColumnFromOffset(uint32_t offset)
     return { line, column };
 }
 
-[[noreturn]] void Context::Error(uint32_t offset, const char* fmt, ...)
+[[noreturn]] void Context::Error(Location location, const char* fmt, ...) const
 {
-    auto location = LineColumnFromOffset(offset);
-    fprintf(stderr, "%s:%d:%d ", filename.c_str(),location.first, location.second);
+    auto lineColumn = LineColumnFromLocation(location);
+    fprintf(stderr, "%s:%d:%d ", filename.c_str(),lineColumn.first, lineColumn.second);
 
     va_list va;
     va_start(va, fmt);

@@ -20,6 +20,8 @@ constexpr Ref<T> MakeRef(Args&& ... args)
     return std::make_shared<T>(std::forward<Args>(args)...);
 }
 
+typedef uint32_t Location;
+
 inline std::string ReadFile(const std::string& filename)
 {
     std::ifstream ifs(filename);

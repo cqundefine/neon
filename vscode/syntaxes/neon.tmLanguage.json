@@ -1,0 +1,55 @@
+{
+	"$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+	"name": "Neon",
+	"patterns": [
+		{
+			"include": "#keywords"
+		},
+		{
+			"include": "#strings"
+		},
+		{
+			"include": "#numbers"
+		}
+	],
+	"repository": {
+		"keywords": {
+			"patterns": [
+				{
+					"name": "keyword.control.neon",
+					"match": "\\b(if|else|return|while)\\b"
+				},
+				{
+					"name": "keyword.neon",
+					"match": "\\b(syscall[0-3])\\b"
+				},
+				{
+					"name": "keyword.neon",
+					"match": "\\b(function|to)\\b"
+				},
+				{
+					"name": "support.type",
+					"match": "\\b(int8|uint8|int16|uint16|int32|uint32|int64|uint64|void)\\b"
+				}
+			]
+		},
+		"strings": {
+			"name": "string.quoted.double.neon",
+			"begin": "\"",
+			"end": "\"",
+			"patterns": [
+				{
+					"name": "constant.character.escape.neon",
+					"match": "\\\\."
+				}
+			]
+		},
+		"numbers": {
+			"patterns": [{
+				"name": "constant.numeric.neon",
+				"match": "\\b\\d+\\b"
+			}]
+		}
+	},
+	"scopeName": "source.ne"
+}

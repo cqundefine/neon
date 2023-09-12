@@ -1,6 +1,6 @@
 #pragma once
 
-#include <string>
+#include <Utils.h>
 
 enum class TokenType
 {
@@ -15,6 +15,8 @@ enum class TokenType
     RParen,
     LCurly,
     RCurly,
+    LSquareBracket,
+    RSquareBracket,
     Colon,
     Semicolon,
     Plus,
@@ -23,9 +25,13 @@ enum class TokenType
     Slash,
     Comma,
     Equals,
+    NotEqual,
     DoubleEquals,
     GreaterThan,
+    GreaterThanOrEqual,
     LessThan,
+    LessThanOrEqual,
+    ExclamationMark,
 
     // Keywords
     Function,
@@ -47,7 +53,7 @@ struct Token
     uint64_t intValue;
 
     size_t length;
-    uint32_t offset;
+    Location location;
 
     std::string ToString();
 };

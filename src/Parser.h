@@ -10,15 +10,15 @@ class Parser
 public:
     inline explicit Parser(const Lexer& lexer) : m_lexer(lexer) {}
 
-    std::shared_ptr<ParsedFile> Parse();
+    Ref<ParsedFile> Parse();
 
 private:
-    std::shared_ptr<BlockAST> ParseBlock();
+    Ref<BlockAST> ParseBlock();
     ExpressionOrStatement ParseStatement();
-    std::shared_ptr<ExpressionAST> ParseExpression();
-    std::shared_ptr<ExpressionAST> ParsePrimary();
-    BinaryOperation ParseOperation();
-    llvm::Type* ParseType();
+    Ref<ExpressionAST> ParseExpression();
+    Ref<ExpressionAST> ParsePrimary();
+    std::pair<BinaryOperation, Location> ParseOperation();
+    Ref<Type> ParseType();
 
     void ExpectToken(TokenType tokenType);
 

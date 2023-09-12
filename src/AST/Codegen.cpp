@@ -10,41 +10,7 @@ static std::map<std::string, llvm::AllocaInst*> allocas;
 
 llvm::Value* NumberExpressionAST::Codegen() const
 {
-    static_assert(static_cast<uint32_t>(NumberType::_NumberTypeCount) == 8, "Not all number types are handled in NumberExpressionAST::Codegen()");
-
-    llvm::APInt apInt;
-
-    switch (type)
-    {
-    case NumberType::Int8:
-        apInt = llvm::APInt(8, value, true);
-        break;
-    case NumberType::UInt8:
-        apInt = llvm::APInt(8, value, false);
-        break;
-    case NumberType::Int16:
-        apInt = llvm::APInt(16, value, true);
-        break;
-    case NumberType::UInt16:
-        apInt = llvm::APInt(16, value, false);
-        break;
-    case NumberType::Int32:
-        apInt = llvm::APInt(32, value, true);
-        break;
-    case NumberType::UInt32:
-        apInt = llvm::APInt(32, value, false);
-        break;
-    case NumberType::Int64:
-        apInt = llvm::APInt(64, value, true);
-        break;
-    case NumberType::UInt64:
-        apInt = llvm::APInt(64, value, false);
-        break;
-    default:
-        assert(false);
-    }
-
-    return llvm::ConstantInt::get(*g_context->llvmContext, apInt);
+    return llvm::ConstantInt::get(*g_context->llvmContext, llvm::APInt(type->bits, value, type->isSigned));
 }
 
 llvm::Value* VariableExpressionAST::Codegen() const
@@ -64,32 +30,62 @@ llvm::Value* StringLiteralAST::Codegen() const
 
 llvm::Value* BinaryExpressionAST::Codegen() const
 {
-    static_assert(static_cast<uint32_t>(BinaryOperation::_BinaryOperationCount) == 6, "Not all binary operations are handled in BinaryExpressionAST::Codegen()");
+    static_assert(static_cast<uint32_t>(BinaryOperation::_BinaryOperationCount) == 10, "Not all binary operations are handled in BinaryExpressionAST::Codegen()");
 
-    auto lhsCodegenned = lhs->Codegen();
-    // FIXME: unsigned
-    auto rhsCodegenned = g_context->builder->CreateIntCast(rhs->Codegen(), lhsCodegenned->getType(), true, "bincast");
-
-    assert(lhsCodegenned->getType() == rhsCodegenned->getType());
-
-    switch(binaryOperation)
+    if(lhs->GetType()->type == TypeEnum::Integer && rhs->GetType()->type == TypeEnum::Integer)
     {
-        case BinaryOperation::Add:
-            return g_context->builder->CreateAdd(lhsCodegenned, rhsCodegenned, "add");
-        case BinaryOperation::Subtract:
-            return g_context->builder->CreateSub(lhsCodegenned, rhsCodegenned, "sub");
-        case BinaryOperation::Multiply:
-            return g_context->builder->CreateMul(lhsCodegenned, rhsCodegenned, "mul");
-        case BinaryOperation::Divide:
-            // FIXME: not always signed
-            return g_context->builder->CreateSDiv(lhsCodegenned, rhsCodegenned, "div");
-        case BinaryOperation::Equals:
-            return g_context->builder->CreateICmpEQ(lhsCodegenned, rhsCodegenned, "eq");
-        case BinaryOperation::GreaterThan:
-            // FIXME: not always signed
-            return g_context->builder->CreateICmpSGT(lhsCodegenned, rhsCodegenned, "gt");
-        default:
-            assert(false);
+        assert(*lhs->GetType() == *rhs->GetType());
+        
+        auto lhsInt = reinterpret_cast<NumberExpressionAST*>(lhs.get());
+        auto rhsInt = reinterpret_cast<NumberExpressionAST*>(rhs.get());
+
+        auto lhsCodegenned = lhs->Codegen();
+        auto rhsCodegenned = g_context->builder->CreateIntCast(rhs->Codegen(), lhsCodegenned->getType(), lhsInt->type->isSigned, "bincast");
+
+        switch(binaryOperation)
+        {
+            case BinaryOperation::Add:
+                return g_context->builder->CreateAdd(lhsCodegenned, rhsCodegenned, "add");
+            case BinaryOperation::Subtract:
+                return g_context->builder->CreateSub(lhsCodegenned, rhsCodegenned, "sub");
+            case BinaryOperation::Multiply:
+                return g_context->builder->CreateMul(lhsCodegenned, rhsCodegenned, "mul");
+            case BinaryOperation::Divide:
+                if (lhsInt->type->isSigned)
+                    return g_context->builder->CreateSDiv(lhsCodegenned, rhsCodegenned, "div");
+                else
+                    return g_context->builder->CreateUDiv(lhsCodegenned, rhsCodegenned, "div");
+            case BinaryOperation::Equals:
+                return g_context->builder->CreateICmpEQ(lhsCodegenned, rhsCodegenned, "eq");
+            case BinaryOperation::NotEqual:
+                return g_context->builder->CreateICmpNE(lhsCodegenned, rhsCodegenned, "ne");
+            case BinaryOperation::GreaterThan:
+                if (lhsInt->type->isSigned)
+                    return g_context->builder->CreateICmpSGT(lhsCodegenned, rhsCodegenned, "gt");
+                else
+                    return g_context->builder->CreateICmpUGT(lhsCodegenned, rhsCodegenned, "gt");
+            case BinaryOperation::GreaterThanOrEqual:
+                if (lhsInt->type->isSigned)
+                    return g_context->builder->CreateICmpSGE(lhsCodegenned, rhsCodegenned, "ge");
+                else
+                    return g_context->builder->CreateICmpUGE(lhsCodegenned, rhsCodegenned, "ge");
+            case BinaryOperation::LessThan:
+                if (lhsInt->type->isSigned)
+                    return g_context->builder->CreateICmpSLT(lhsCodegenned, rhsCodegenned, "lt");
+                else
+                    return g_context->builder->CreateICmpULT(lhsCodegenned, rhsCodegenned, "lt");
+            case BinaryOperation::LessThanOrEqual:
+                if (lhsInt->type->isSigned)
+                    return g_context->builder->CreateICmpSLE(lhsCodegenned, rhsCodegenned, "le");
+                else
+                    return g_context->builder->CreateICmpULE(lhsCodegenned, rhsCodegenned, "le");
+            default:
+                assert(false);
+        }
+    }
+    else
+    {
+        assert(false);
     }
 }
 
@@ -107,8 +103,9 @@ llvm::Value* CallExpressionAST::Codegen() const
 
 llvm::Value* CastExpressionAST::Codegen() const
 {
-    // FIXME: Not always unsigned
-    return g_context->builder->CreateIntCast(child->Codegen(), castedTo, false, "cast");
+    assert(castedTo->type == TypeEnum::Integer);
+    auto numberType = reinterpret_cast<IntegerType*>(castedTo.get());
+    return g_context->builder->CreateIntCast(child->Codegen(), numberType->GetType(), numberType->isSigned, "cast");
 }
 
 void ReturnStatementAST::Codegen() const
@@ -120,10 +117,10 @@ void BlockAST::Codegen() const
 {
     for(const auto& statement : statements)
     {
-        if (std::holds_alternative<std::shared_ptr<StatementAST>>(statement))
-            std::get<std::shared_ptr<StatementAST>>(statement)->Codegen();
+        if (std::holds_alternative<Ref<StatementAST>>(statement))
+            std::get<Ref<StatementAST>>(statement)->Codegen();
         else
-            std::get<std::shared_ptr<ExpressionAST>>(statement)->Codegen();
+            std::get<Ref<ExpressionAST>>(statement)->Codegen();
     }
 }
 
@@ -188,7 +185,7 @@ void VariableDefinitionAST::Codegen() const
 {
     auto parentFunction = g_context->builder->GetInsertBlock()->getParent();
     llvm::IRBuilder<> functionBeginBuilder(&parentFunction->getEntryBlock(), parentFunction->getEntryBlock().begin());
-    allocas[name] = functionBeginBuilder.CreateAlloca(type, nullptr, name);
+    allocas[name] = functionBeginBuilder.CreateAlloca(type->GetType(), nullptr, name);
     if (initialValue != nullptr)
         g_context->builder->CreateStore(initialValue->Codegen(), allocas[name]);
 }
@@ -202,7 +199,7 @@ llvm::Function* FunctionAST::Codegen() const
 {
     std::vector<llvm::Type*> llvmParams;
     for (const auto& param : params)
-        llvmParams.push_back(param.type);
+        llvmParams.push_back(param.type->GetType());
 
     auto functionType = llvm::FunctionType::get(llvm::Type::getInt32Ty(*g_context->llvmContext), llvmParams, false);
     auto function = llvm::Function::Create(functionType, llvm::Function::ExternalLinkage, name, g_context->module.get());

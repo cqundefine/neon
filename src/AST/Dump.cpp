@@ -7,7 +7,7 @@
 void NumberExpressionAST::Dump(uint32_t indentCount) const
 {
     INDENT(indentCount);
-    printf("Number Expression (`%lu`, %s)\n", value, NumberTypeToString(type).c_str());
+    printf("Number Expression (`%lu`, %s)\n", value, type->Dump().c_str());
 }
 
 void VariableExpressionAST::Dump(uint32_t indentCount) const
@@ -45,7 +45,7 @@ void CallExpressionAST::Dump(uint32_t indentCount) const
 void CastExpressionAST::Dump(uint32_t indentCount) const
 {
     INDENT(indentCount);
-    printf("Cast Expression (`%d`)\n", castedTo->getTypeID());
+    printf("Cast Expression (%s)\n", castedTo->Dump().c_str());
     child->Dump(indentCount + 1);
 }
 
@@ -63,10 +63,10 @@ void BlockAST::Dump(uint32_t indentCount) const
 
     for(const auto& statement : statements)
     {
-        if (std::holds_alternative<std::shared_ptr<StatementAST>>(statement))
-            std::get<std::shared_ptr<StatementAST>>(statement)->Dump(indentCount + 1);
+        if (std::holds_alternative<Ref<StatementAST>>(statement))
+            std::get<Ref<StatementAST>>(statement)->Dump(indentCount + 1);
         else
-            std::get<std::shared_ptr<ExpressionAST>>(statement)->Dump(indentCount + 1);
+            std::get<Ref<ExpressionAST>>(statement)->Dump(indentCount + 1);
     }
 }
 
@@ -91,8 +91,9 @@ void WhileStatementAST::Dump(uint32_t indentCount) const
 void VariableDefinitionAST::Dump(uint32_t indentCount) const
 {
     INDENT(indentCount);
-    printf("Variable Declaration (`%s`, `%u`)\n", name.c_str(), type->getTypeID());
-    initialValue->Dump(indentCount + 1);
+    printf("Variable Declaration (`%s`, %s)\n", name.c_str(), type->Dump().c_str());
+    if (initialValue != nullptr)
+        initialValue->Dump(indentCount + 1);
 }
 
 void AssignmentStatementAST::Dump(uint32_t indentCount) const
@@ -109,7 +110,7 @@ void FunctionAST::Dump(uint32_t indentCount) const
     for (const auto& param : params)
     {
         INDENT(indentCount + 1);
-        printf("Param ('%s', '%u')\n", param.name.c_str(), param.type->getTypeID());
+        printf("Param ('%s', %s)\n", param.name.c_str(), param.type->Dump().c_str());
     }
     if (block != nullptr)
         block->Dump(indentCount + 1);

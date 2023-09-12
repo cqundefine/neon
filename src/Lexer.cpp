@@ -2,7 +2,7 @@
 
 Token Lexer::NextToken() const
 {
-    static_assert(static_cast<uint32_t>(TokenType::_TokenTypeCount) == 24, "Not all tokens are handled in Lexer::NextToken()");
+    static_assert(static_cast<uint32_t>(TokenType::_TokenTypeCount) == 30, "Not all tokens are handled in Lexer::NextToken()");
 
     uint32_t beginIndex = m_index;
 
@@ -19,57 +19,67 @@ Token Lexer::NextToken() const
     if (g_context->fileContent[m_index] == '(')
     {
         m_index++;
-        return { .type = TokenType::LParen, .length = m_index - beginIndex, .offset = m_index - 1 };
+        return { .type = TokenType::LParen, .length = m_index - beginIndex, .location = m_index - 1 };
     }
     else if (g_context->fileContent[m_index] == ')')
     {
         m_index++;
-        return { .type = TokenType::RParen, .length = m_index - beginIndex, .offset = m_index - 1 };
+        return { .type = TokenType::RParen, .length = m_index - beginIndex, .location = m_index - 1 };
     }
     else if (g_context->fileContent[m_index] == '{')
     {
         m_index++;
-        return { .type = TokenType::LCurly, .length = m_index - beginIndex, .offset = m_index - 1 };
+        return { .type = TokenType::LCurly, .length = m_index - beginIndex, .location = m_index - 1 };
     }
     else if (g_context->fileContent[m_index] == '}')
     {
         m_index++;
-        return { .type = TokenType::RCurly, .length = m_index - beginIndex, .offset = m_index - 1 };
+        return { .type = TokenType::RCurly, .length = m_index - beginIndex, .location = m_index - 1 };
+    }
+    else if (g_context->fileContent[m_index] == '[')
+    {
+        m_index++;
+        return { .type = TokenType::LSquareBracket, .length = m_index - beginIndex, .location = m_index - 1 };
+    }
+    else if (g_context->fileContent[m_index] == ']')
+    {
+        m_index++;
+        return { .type = TokenType::RSquareBracket, .length = m_index - beginIndex, .location = m_index - 1 };
     }
     else if (g_context->fileContent[m_index] == ':')
     {
         m_index++;
-        return { .type = TokenType::Colon, .length = m_index - beginIndex, .offset = m_index - 1 };
+        return { .type = TokenType::Colon, .length = m_index - beginIndex, .location = m_index - 1 };
     }
     else if (g_context->fileContent[m_index] == ';')
     {
         m_index++;
-        return { .type = TokenType::Semicolon, .length = m_index - beginIndex, .offset = m_index - 1 };
+        return { .type = TokenType::Semicolon, .length = m_index - beginIndex, .location = m_index - 1 };
     }
     else if (g_context->fileContent[m_index] == '+')
     {
         m_index++;
-        return { .type = TokenType::Plus, .length = m_index - beginIndex, .offset = m_index - 1 };
+        return { .type = TokenType::Plus, .length = m_index - beginIndex, .location = m_index - 1 };
     }
     else if (g_context->fileContent[m_index] == '-')
     {
         m_index++;
-        return { .type = TokenType::Minus, .length = m_index - beginIndex, .offset = m_index - 1 };
+        return { .type = TokenType::Minus, .length = m_index - beginIndex, .location = m_index - 1 };
     }
     else if (g_context->fileContent[m_index] == '*')
     {
         m_index++;
-        return { .type = TokenType::Asterisk, .length = m_index - beginIndex, .offset = m_index - 1 };
+        return { .type = TokenType::Asterisk, .length = m_index - beginIndex, .location = m_index - 1 };
     }
     else if (g_context->fileContent[m_index] == '/')
     {
         m_index++;
-        return { .type = TokenType::Slash, .length = m_index - beginIndex, .offset = m_index - 1 };
+        return { .type = TokenType::Slash, .length = m_index - beginIndex, .location = m_index - 1 };
     }
     else if (g_context->fileContent[m_index] == ',')
     {
         m_index++;
-        return { .type = TokenType::Comma, .length = m_index - beginIndex, .offset = m_index - 1 };
+        return { .type = TokenType::Comma, .length = m_index - beginIndex, .location = m_index - 1 };
     }
     else if (g_context->fileContent[m_index] == '=')
     {
@@ -77,20 +87,40 @@ Token Lexer::NextToken() const
         if (g_context->fileContent[m_index] == '=')
         {
             m_index++;
-            return { .type = TokenType::DoubleEquals, .length = m_index - beginIndex, .offset = m_index - 2 };
+            return { .type = TokenType::DoubleEquals, .length = m_index - beginIndex, .location = m_index - 2 };
         }
 
-        return { .type = TokenType::Equals, .length = m_index - beginIndex, .offset = m_index - 1 };
+        return { .type = TokenType::Equals, .length = m_index - beginIndex, .location = m_index - 1 };
     }
     else if (g_context->fileContent[m_index] == '>')
     {
         m_index++;
-        return { .type = TokenType::GreaterThan, .length = m_index - beginIndex, .offset = m_index - 1 };
+        if (g_context->fileContent[m_index] == '=')
+        {
+            m_index++;
+            return { .type = TokenType::GreaterThanOrEqual, .length = m_index - beginIndex, .location = m_index - 2 };
+        }
+        return { .type = TokenType::GreaterThan, .length = m_index - beginIndex, .location = m_index - 1 };
     }
     else if (g_context->fileContent[m_index] == '<')
     {
         m_index++;
-        return { .type = TokenType::LessThan, .length = m_index - beginIndex, .offset = m_index - 1 };
+        if (g_context->fileContent[m_index] == '=')
+        {
+            m_index++;
+            return { .type = TokenType::LessThanOrEqual, .length = m_index - beginIndex, .location = m_index - 2 };
+        }
+        return { .type = TokenType::LessThan, .length = m_index - beginIndex, .location = m_index - 1 };
+    }
+    else if (g_context->fileContent[m_index] == '!')
+    {
+        m_index++;
+        if (g_context->fileContent[m_index] == '=')
+        {
+            m_index++;
+            return { .type = TokenType::NotEqual, .length = m_index - beginIndex, .location = m_index - 2 };
+        }
+        return { .type = TokenType::ExclamationMark, .length = m_index - beginIndex, .location = m_index - 1 };
     }
     else if (g_context->fileContent[m_index] == '"')
     {
@@ -127,7 +157,7 @@ Token Lexer::NextToken() const
             .type = TokenType::StringLiteral,
             .stringValue = value,
             .length = m_index - beginIndex,
-            .offset = trueBeginIndex
+            .location = trueBeginIndex
         };
     }
 
@@ -144,7 +174,7 @@ Token Lexer::NextToken() const
             .type = TokenType::Number,
             .intValue = std::strtoull(numberString.c_str(), 0, 10),
             .length = m_index - beginIndex,
-            .offset = trueBeginIndex
+            .location = trueBeginIndex
         };
     }
     else if (isalpha(g_context->fileContent[m_index]) || g_context->fileContent[m_index] == '_')
@@ -157,23 +187,25 @@ Token Lexer::NextToken() const
         } while(isalnum(g_context->fileContent[m_index])  || g_context->fileContent[m_index] == '_');
     
         if (value == "function")
-            return { .type = TokenType::Function, .length = m_index - beginIndex, .offset = trueBeginIndex };
+            return { .type = TokenType::Function, .length = m_index - beginIndex, .location = trueBeginIndex };
         else if (value == "return")
-            return { .type = TokenType::Return, .length = m_index - beginIndex, .offset = trueBeginIndex };
+            return { .type = TokenType::Return, .length = m_index - beginIndex, .location = trueBeginIndex };
         else if (value == "if")
-            return { .type = TokenType::If, .length = m_index - beginIndex, .offset = trueBeginIndex };
+            return { .type = TokenType::If, .length = m_index - beginIndex, .location = trueBeginIndex };
         else if (value == "extern")
-            return { .type = TokenType::Extern, .length = m_index - beginIndex, .offset = trueBeginIndex };
+            return { .type = TokenType::Extern, .length = m_index - beginIndex, .location = trueBeginIndex };
         else if (value == "while")
-            return { .type = TokenType::While, .length = m_index - beginIndex, .offset = trueBeginIndex };
+            return { .type = TokenType::While, .length = m_index - beginIndex, .location = trueBeginIndex };
         else
             return { 
                 .type = TokenType::Identifier,
                 .stringValue = value,
                 .length = m_index - beginIndex,
-                .offset = trueBeginIndex
+                .location = trueBeginIndex
             };
     }
+
+    printf("%X\n", g_context->fileContent[1]);
 
     g_context->Error(m_index, "Unexpected symbol: %c", g_context->fileContent[m_index]);
 }

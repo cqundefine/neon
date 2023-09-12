@@ -3,7 +3,7 @@
 
 std::string TokenTypeToString(TokenType tokenType)
 {
-    static_assert(static_cast<uint32_t>(TokenType::_TokenTypeCount) == 24, "Not all tokens are handled in Token::ToString()");
+    static_assert(static_cast<uint32_t>(TokenType::_TokenTypeCount) == 30, "Not all tokens are handled in Token::ToString()");
 
     switch (tokenType)
     {
@@ -23,6 +23,10 @@ std::string TokenTypeToString(TokenType tokenType)
             return "LCurly";
         case TokenType::RCurly:
             return "RCurly";
+        case TokenType::LSquareBracket:
+            return "LSquareBracket";
+        case TokenType::RSquareBracket:
+            return "RSquareBracket";
         case TokenType::Colon:
             return "Colon";
         case TokenType::Semicolon:
@@ -39,12 +43,20 @@ std::string TokenTypeToString(TokenType tokenType)
             return "Comma";
         case TokenType::Equals:
             return "Equals";
+        case TokenType::NotEqual:
+            return "NotEqual";
         case TokenType::DoubleEquals:
             return "DoubleEquals";
         case TokenType::GreaterThan:
             return "GreaterThan";
+        case TokenType::GreaterThanOrEqual:
+            return "GreaterThanOrEqual";
         case TokenType::LessThan:
             return "LessThan";
+        case TokenType::LessThanOrEqual:
+            return "LessThanOrEqual";
+        case TokenType::ExclamationMark:
+            return "ExclamationMark";
         case TokenType::Function:
             return "Function";
         case TokenType::Return:
@@ -62,7 +74,7 @@ std::string TokenTypeToString(TokenType tokenType)
 
 std::string Token::ToString()
 {
-    static_assert(static_cast<uint32_t>(TokenType::_TokenTypeCount) == 24, "Not all tokens are handled in Token::ToString()");
+    static_assert(static_cast<uint32_t>(TokenType::_TokenTypeCount) == 30, "Not all tokens are handled in Token::ToString()");
     switch(type)
     {
         case TokenType::Number:
@@ -81,6 +93,10 @@ std::string Token::ToString()
             return "LCurly (`{`)";
         case TokenType::RCurly:
             return "RCurly (`}`)";
+        case TokenType::LSquareBracket:
+            return "LSquareBracket (`[`)";
+        case TokenType::RSquareBracket:
+            return "RSquareBracket (`]`)";
         case TokenType::Colon:
             return "Colon (`:`)";
         case TokenType::Semicolon:
@@ -97,12 +113,20 @@ std::string Token::ToString()
             return "Comma (`,`)";
         case TokenType::Equals:
             return "Equals (`=`)";
+        case TokenType::NotEqual:
+            return "Equals (`!=`)";
         case TokenType::DoubleEquals:
             return "DoubleEquals (`==`)";
         case TokenType::GreaterThan:
             return "GreaterThan (`>`)";
+        case TokenType::GreaterThanOrEqual:
+            return "GreaterThan (`>=`)";
         case TokenType::LessThan:
             return "LessThan (`<`)";
+        case TokenType::LessThanOrEqual:
+            return "LessThan (`<=`)";
+        case TokenType::ExclamationMark:
+            return "LessThan (`!`)";
         case TokenType::Function:
             return "Function (`function`)";
         case TokenType::Return:

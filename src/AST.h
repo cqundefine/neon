@@ -2,10 +2,12 @@
 
 #include <Enums.h>
 #include <llvm/IR/Value.h>
+#include <Type.h>
+#include <Utils.h>
 #include <variant>
 
 // FIXME: Use typedef or using ... = ...
-#define ExpressionOrStatement std::variant<std::shared_ptr<StatementAST>, std::shared_ptr<ExpressionAST>>
+#define ExpressionOrStatement std::variant<Ref<StatementAST>, Ref<ExpressionAST>>
 
 enum class ExpressionType
 {
@@ -17,92 +19,108 @@ enum class ExpressionType
     Cast
 };
 
-struct ExpressionAST
+struct AST
+{
+    Location location;
+
+    inline AST(Location location) : location(location) {}
+};
+
+struct ExpressionAST : public AST
 {
     ExpressionType type;
 
-    ExpressionAST(ExpressionType type);
+    inline ExpressionAST(Location location, ExpressionType type) : AST(location), type(type) {}
 
     virtual void Dump(uint32_t indentCount) const = 0;
     virtual llvm::Value* Codegen() const = 0;
     virtual void Typecheck() const = 0;
+    virtual Ref<Type> GetType() const = 0;
 };
 
 struct NumberExpressionAST : public ExpressionAST
 {
     uint64_t value;
-    NumberType type;
+    Ref<IntegerType> type;
 
-    NumberExpressionAST(uint64_t value, NumberType type);
+    inline NumberExpressionAST(Location location, uint64_t value, Ref<IntegerType> type) : ExpressionAST(location, ExpressionType::Number), value(value), type(type) {}
 
     void AdjustTypeToBits(uint32_t bits);
 
     virtual void Dump(uint32_t indentCount) const override;
     virtual llvm::Value* Codegen() const override;
     virtual void Typecheck() const override;
+    virtual inline Ref<Type> GetType() const override { return type; };
 };
 
 struct VariableExpressionAST : public ExpressionAST
 {
     std::string name;
 
-    VariableExpressionAST(const std::string& name);
+    inline VariableExpressionAST(Location location, const std::string& name) : ExpressionAST(location, ExpressionType::Variable), name(name) {}
 
     virtual void Dump(uint32_t indentCount) const override;
     virtual llvm::Value* Codegen() const override;
     virtual void Typecheck() const override;
+    virtual Ref<Type> GetType() const override;
 };
 
 struct StringLiteralAST : public ExpressionAST
 {
     std::string value;
 
-    StringLiteralAST(const std::string& value);
+    inline StringLiteralAST(Location location, const std::string& value) : ExpressionAST(location, ExpressionType::StringLiteral), value(value) {}
 
     virtual void Dump(uint32_t indentCount) const override;
     virtual llvm::Value* Codegen() const override;
     virtual void Typecheck() const override;
+    virtual inline Ref<Type> GetType() const override { return MakeRef<StringType>(); };
 };
 
 struct BinaryExpressionAST : public ExpressionAST
 {
-    std::shared_ptr<ExpressionAST> lhs;
+    Ref<ExpressionAST> lhs;
     BinaryOperation binaryOperation;
-    std::shared_ptr<ExpressionAST> rhs;
+    Ref<ExpressionAST> rhs;
 
-    BinaryExpressionAST(std::shared_ptr<ExpressionAST> lhs, BinaryOperation binaryOperation, std::shared_ptr<ExpressionAST> rhs);
+    inline BinaryExpressionAST(Location location, Ref<ExpressionAST> lhs, BinaryOperation binaryOperation, Ref<ExpressionAST> rhs) : ExpressionAST(location, ExpressionType::Binary), lhs(lhs), binaryOperation(binaryOperation), rhs(rhs) {}
 
     virtual void Dump(uint32_t indentCount) const override;
     virtual llvm::Value* Codegen() const override;
     virtual void Typecheck() const override;
+    virtual inline Ref<Type> GetType() const override { return lhs->GetType(); };
 };
 
 struct CallExpressionAST : public ExpressionAST
 {
     std::string calleeName;
-    std::vector<std::shared_ptr<ExpressionAST>> args;
+    std::vector<Ref<ExpressionAST>> args;
     
-    CallExpressionAST(std::string calleeName, std::vector<std::shared_ptr<ExpressionAST>> args);
+    inline CallExpressionAST(Location location, std::string calleeName, std::vector<Ref<ExpressionAST>> args) : ExpressionAST(location, ExpressionType::Call), calleeName(calleeName), args(args) {}
     
     virtual void Dump(uint32_t indentCount) const override;
     virtual llvm::Value* Codegen() const override;
     virtual void Typecheck() const override;
+    virtual Ref<Type> GetType() const override;
 };
 
 struct CastExpressionAST : public ExpressionAST
 {
-    llvm::Type* castedTo;
-    std::shared_ptr<ExpressionAST> child;
+    Ref<Type> castedTo;
+    Ref<ExpressionAST> child;
 
-    CastExpressionAST(llvm::Type* castedTo, std::shared_ptr<ExpressionAST> child);
+    inline CastExpressionAST(Location location, Ref<Type> castedTo, Ref<ExpressionAST> child) : ExpressionAST(location, ExpressionType::Cast), castedTo(castedTo), child(child) {}
     
     virtual void Dump(uint32_t indentCount) const override;
     virtual llvm::Value* Codegen() const override;
     virtual void Typecheck() const override;
+    virtual inline Ref<Type> GetType() const override { return castedTo; };
 };
 
-struct StatementAST
+struct StatementAST : public AST
 {
+    inline StatementAST(Location location) : AST(location) {}
+
     virtual void Dump(uint32_t indentCount) const = 0;
     virtual void Codegen() const = 0;
     virtual void Typecheck() const = 0;
@@ -110,20 +128,20 @@ struct StatementAST
 
 struct ReturnStatementAST : public StatementAST
 {
-    std::shared_ptr<ExpressionAST> value;
+    Ref<ExpressionAST> value;
     
-    ReturnStatementAST(std::shared_ptr<ExpressionAST> value);
+    inline ReturnStatementAST(Location location, Ref<ExpressionAST> value) : StatementAST(location), value(value) {}
     
     virtual void Dump(uint32_t indentCount) const override;
     virtual void Codegen() const override;
     virtual void Typecheck() const override;
 };
 
-struct BlockAST
+struct BlockAST : public AST
 {
     std::vector<ExpressionOrStatement> statements;
 
-    BlockAST(const std::vector<ExpressionOrStatement>& statements);
+    inline BlockAST(Location location, const std::vector<ExpressionOrStatement>& statements) : AST(location), statements(statements) {}
     
     void Dump(uint32_t indentCount) const;
     void Codegen() const;
@@ -132,11 +150,11 @@ struct BlockAST
 
 struct IfStatementAST : public StatementAST
 {
-    std::shared_ptr<ExpressionAST> condition;
-    std::shared_ptr<BlockAST> block;
-    std::shared_ptr<BlockAST> elseBlock;
+    Ref<ExpressionAST> condition;
+    Ref<BlockAST> block;
+    Ref<BlockAST> elseBlock;
 
-    IfStatementAST(std::shared_ptr<ExpressionAST> condition, std::shared_ptr<BlockAST> block, std::shared_ptr<BlockAST> elseBlock);
+    inline IfStatementAST(Location location, Ref<ExpressionAST> condition, Ref<BlockAST> block, Ref<BlockAST> elseBlock) : StatementAST(location), condition(condition), block(block), elseBlock(elseBlock) {}
     
     virtual void Dump(uint32_t indentCount) const override;
     virtual void Codegen() const override;
@@ -145,10 +163,10 @@ struct IfStatementAST : public StatementAST
 
 struct WhileStatementAST : public StatementAST
 {
-    std::shared_ptr<ExpressionAST> condition;
-    std::shared_ptr<BlockAST> block;
+    Ref<ExpressionAST> condition;
+    Ref<BlockAST> block;
 
-    WhileStatementAST(std::shared_ptr<ExpressionAST> condition, std::shared_ptr<BlockAST> block);
+    inline WhileStatementAST(Location location, Ref<ExpressionAST> condition, Ref<BlockAST> block) : StatementAST(location), condition(condition), block(block) {}
     
     virtual void Dump(uint32_t indentCount) const override;
     virtual void Codegen() const override;
@@ -158,10 +176,10 @@ struct WhileStatementAST : public StatementAST
 struct VariableDefinitionAST : public StatementAST
 {
     std::string name;
-    llvm::Type* type;
-    std::shared_ptr<ExpressionAST> initialValue;
+    Ref<Type> type;
+    Ref<ExpressionAST> initialValue;
 
-    VariableDefinitionAST(const std::string& name, llvm::Type* type, std::shared_ptr<ExpressionAST> initialValue);
+    inline VariableDefinitionAST(Location location, const std::string& name, Ref<Type> type, Ref<ExpressionAST> initialValue) : StatementAST(location), name(name), type(type), initialValue(initialValue) {}
 
     virtual void Dump(uint32_t indentCount) const override;
     virtual void Codegen() const override;
@@ -171,29 +189,29 @@ struct VariableDefinitionAST : public StatementAST
 struct AssignmentStatementAST : public StatementAST
 {
     std::string name;
-    std::shared_ptr<ExpressionAST> value;
+    Ref<ExpressionAST> value;
 
-    AssignmentStatementAST(std::string name, std::shared_ptr<ExpressionAST> value);
+    inline AssignmentStatementAST(Location location, std::string name, Ref<ExpressionAST> value) : StatementAST(location), name(name), value(value) {}
 
     virtual void Dump(uint32_t indentCount) const override;
     virtual void Codegen() const override;
     virtual void Typecheck() const override;
 };
 
-struct FunctionAST
+struct FunctionAST : public AST
 {
     struct Param
     {
         std::string name;
-        llvm::Type* type;
+        Ref<Type> type;
     };
 
     std::string name;
     std::vector<Param> params;
-    llvm::Type* returnType;
-    std::shared_ptr<BlockAST> block;
+    Ref<Type> returnType;
+    Ref<BlockAST> block;
 
-    FunctionAST(const std::string& name, std::vector<Param> params, llvm::Type* returnType, std::shared_ptr<BlockAST> block);
+    inline FunctionAST(Location location, const std::string& name, std::vector<Param> params, Ref<Type> returnType, Ref<BlockAST> block) : AST(location), name(name), params(params), returnType(returnType), block(block) {}
     
     void Dump(uint32_t indentCount) const;
     llvm::Function* Codegen() const;
@@ -202,9 +220,9 @@ struct FunctionAST
 
 struct ParsedFile
 {
-    std::vector<std::shared_ptr<FunctionAST>> functions;
+    std::vector<Ref<FunctionAST>> functions;
 
-    ParsedFile(const std::vector<std::shared_ptr<FunctionAST>>& functions);
+    inline ParsedFile(const std::vector<Ref<FunctionAST>>& functions) : functions(functions) {}
 
     void Dump(uint32_t indentCount = 0) const;
     void Codegen() const;

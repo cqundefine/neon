@@ -2,11 +2,18 @@
 #include <Context.h>
 #include <llvm/IR/Type.h>
 
-struct TypecheckAlloca
+std::vector<std::map<std::string, Ref<Type>>> typecheckBlockStack;
+[[nodiscard]] Ref<Type> FindVariable(const std::string& name)
 {
-    llvm::Type* type;
-};
-static std::map<std::string, TypecheckAlloca> typecheckAllocas;
+    for (int i = typecheckBlockStack.size() - 1; i >= 0; i--)
+    {
+        const auto& block = typecheckBlockStack.at(i);
+        if (block.contains(name))
+            return block.at(name);
+    }
+
+    assert(false);
+}
 
 struct TypecheckFunction
 {
@@ -21,8 +28,8 @@ void NumberExpressionAST::Typecheck() const
 
 void VariableExpressionAST::Typecheck() const
 {
-    if (!typecheckAllocas.count(name))
-        g_context->Error(0, "Unknown variable: %s", name.c_str());
+    if (!FindVariable(name))
+        g_context->Error(location, "Unknown variable: %s", name.c_str());
 }
 
 void StringLiteralAST::Typecheck() const
@@ -57,7 +64,7 @@ void CallExpressionAST::Typecheck() const
 void CastExpressionAST::Typecheck() const
 {
     assert(child->type == ExpressionType::StringLiteral);
-    assert(castedTo->getTypeID() == llvm::Type::IntegerTyID && castedTo->getPrimitiveSizeInBits() == 64);
+    assert(castedTo->type == TypeEnum::Integer && reinterpret_cast<IntegerType*>(castedTo.get())->bits == 64);
 }
 
 void ReturnStatementAST::Typecheck() const
@@ -68,13 +75,17 @@ void ReturnStatementAST::Typecheck() const
 
 void BlockAST::Typecheck() const
 {
+    typecheckBlockStack.push_back({});
+
     for (const auto& statement : statements)
     {
-        if (std::holds_alternative<std::shared_ptr<StatementAST>>(statement))
-            std::get<std::shared_ptr<StatementAST>>(statement)->Typecheck();
+        if (std::holds_alternative<Ref<StatementAST>>(statement))
+            std::get<Ref<StatementAST>>(statement)->Typecheck();
         else
-            std::get<std::shared_ptr<ExpressionAST>>(statement)->Typecheck();   
+            std::get<Ref<ExpressionAST>>(statement)->Typecheck();   
     }
+
+    typecheckBlockStack.pop_back();
 }
 
 void IfStatementAST::Typecheck() const
@@ -93,34 +104,40 @@ void WhileStatementAST::Typecheck() const
 
 void VariableDefinitionAST::Typecheck() const
 {
-    if (initialValue->type == ExpressionType::Number)
+    if (initialValue != nullptr)
     {
-        assert(type->getTypeID() == llvm::Type::IntegerTyID);
-        reinterpret_cast<NumberExpressionAST*>(initialValue.get())->AdjustTypeToBits(reinterpret_cast<llvm::IntegerType*>(type)->getPrimitiveSizeInBits());
+        if (initialValue->type == ExpressionType::Number)
+        {
+            assert(type->type == TypeEnum::Integer);
+            reinterpret_cast<NumberExpressionAST*>(initialValue.get())->AdjustTypeToBits(reinterpret_cast<IntegerType*>(type.get())->bits);
+        }
+        initialValue->Typecheck();
     }
-    initialValue->Typecheck();
-    typecheckAllocas[name] = {
-        .type = type
-    };
+    typecheckBlockStack.back()[name] = type;
     // Check if default assignment is correct
 }
 
 void AssignmentStatementAST::Typecheck() const
 {
     value->Typecheck();
+    
+    if(FindVariable(name) != value->GetType())
+        g_context->Error(location, "Wrong assignment: tried to assign %s to variable of type %s", value->GetType()->Dump().c_str(), FindVariable(name)->Dump().c_str());
+
     // Try adjust type of number value
     // Check if variable exists in the current scope
-    // Check if default assignment is correct
 }
 
 void FunctionAST::Typecheck() const
 {
+    typecheckBlockStack.back()[name] = returnType;
+
     if (block != nullptr)
         block->Typecheck();
     
     std::vector<llvm::Type*> typecheckParams;
     for (const auto& param : params)
-        typecheckParams.push_back(param.type);
+        typecheckParams.push_back(param.type->GetType());
 
     typecheckFunctions[name] = {
         .params = typecheckParams
@@ -129,11 +146,16 @@ void FunctionAST::Typecheck() const
 
 void ParsedFile::Typecheck() const
 {
-    typecheckFunctions["syscall0"] = {{ llvm::Type::getInt64Ty(*g_context->llvmContext) }};
-    typecheckFunctions["syscall1"] = {{ llvm::Type::getInt64Ty(*g_context->llvmContext), llvm::Type::getInt64Ty(*g_context->llvmContext) }};
-    typecheckFunctions["syscall2"] = {{ llvm::Type::getInt64Ty(*g_context->llvmContext), llvm::Type::getInt64Ty(*g_context->llvmContext), llvm::Type::getInt64Ty(*g_context->llvmContext) }};
-    typecheckFunctions["syscall3"] = {{ llvm::Type::getInt64Ty(*g_context->llvmContext), llvm::Type::getInt64Ty(*g_context->llvmContext), llvm::Type::getInt64Ty(*g_context->llvmContext), llvm::Type::getInt64Ty(*g_context->llvmContext) }};
+    typecheckBlockStack.push_back({});
+
+    auto int64 = llvm::Type::getInt64Ty(*g_context->llvmContext);
+    typecheckFunctions["syscall0"] = {{ int64 }};
+    typecheckFunctions["syscall1"] = {{ int64, int64 }};
+    typecheckFunctions["syscall2"] = {{ int64, int64, int64 }};
+    typecheckFunctions["syscall3"] = {{ int64, int64, int64, int64 }};
 
     for (const auto& function : functions)
         function->Typecheck();
+
+    typecheckBlockStack.pop_back();
 }

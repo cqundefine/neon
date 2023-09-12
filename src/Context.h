@@ -4,6 +4,7 @@
 #include <llvm/IR/LegacyPassManager.h>
 #include <llvm/Target/TargetMachine.h>
 
+#include <AST.h>
 #include <Utils.h>
 
 struct Context
@@ -19,8 +20,8 @@ struct Context
     Own<llvm::legacy::FunctionPassManager> functionPassManager;
     llvm::TargetMachine* targetMachine;
 
-    std::pair<uint32_t, uint32_t> LineColumnFromOffset(uint32_t offset);
-    [[noreturn]] void Error(uint32_t offset, const char* fmt, ...);
+    std::pair<uint32_t, uint32_t> LineColumnFromLocation(Location location) const;
+    [[noreturn]] void Error(uint32_t location, const char* fmt, ...) const;
 
     enum class OutputFileType
     {

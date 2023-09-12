@@ -1,9 +1,10 @@
 #include <Parser.h>
+#include <Type.h>
 #include <stack>
 
-std::shared_ptr<ParsedFile> Parser::Parse()
+Ref<ParsedFile> Parser::Parse()
 {
-    std::vector<std::shared_ptr<FunctionAST>> functions;
+    std::vector<Ref<FunctionAST>> functions;
     while (true)
     {
         auto token = m_lexer.NextToken();
@@ -37,7 +38,7 @@ std::shared_ptr<ParsedFile> Parser::Parse()
             ExpectToken(TokenType::Colon);
             ExpectToken(TokenType::Identifier);
             ExpectToken(TokenType::Semicolon);
-            functions.push_back(std::make_shared<FunctionAST>(nameToken.stringValue, params, llvm::Type::getInt32Ty(*g_context->llvmContext), nullptr));
+            functions.push_back(MakeRef<FunctionAST>(token.location, nameToken.stringValue, params, MakeRef<IntegerType>(32, true), nullptr));
         }
         else if (token.type == TokenType::Function)
         {
@@ -48,7 +49,7 @@ std::shared_ptr<ParsedFile> Parser::Parse()
             ExpectToken(TokenType::Colon);
             ExpectToken(TokenType::Identifier);
             std::vector<FunctionAST::Param> params;
-            functions.push_back(std::make_shared<FunctionAST>(nameToken.stringValue, params, llvm::Type::getInt32Ty(*g_context->llvmContext), ParseBlock()));
+            functions.push_back(MakeRef<FunctionAST>(token.location, nameToken.stringValue, params, MakeRef<IntegerType>(32, true), ParseBlock()));
         }
         else if (token.type == TokenType::Eof)
         {
@@ -56,15 +57,16 @@ std::shared_ptr<ParsedFile> Parser::Parse()
         }
         else
         {
-            g_context->Error(token.offset, "Unexpected token: %s", token.ToString().c_str());
+            g_context->Error(token.location, "Unexpected token: %s", token.ToString().c_str());
         }
     }
-    return std::make_shared<ParsedFile>(functions);
+    return MakeRef<ParsedFile>(functions);
 }
 
-std::shared_ptr<BlockAST> Parser::ParseBlock()
+Ref<BlockAST> Parser::ParseBlock()
 {
-    ExpectToken(TokenType::LCurly);
+    auto lcurly = m_lexer.NextToken();
+    assert(lcurly.type == TokenType::LCurly);
     Token token = m_lexer.NextToken();
     
     std::vector<ExpressionOrStatement> statements;
@@ -76,7 +78,7 @@ std::shared_ptr<BlockAST> Parser::ParseBlock()
         token = m_lexer.NextToken();
     }
 
-    return std::make_shared<BlockAST>(statements);
+    return MakeRef<BlockAST>(lcurly.location, statements);
 }
 
 ExpressionOrStatement Parser::ParseStatement()
@@ -86,7 +88,7 @@ ExpressionOrStatement Parser::ParseStatement()
     {
         auto value = ParseExpression();
         ExpectToken(TokenType::Semicolon);
-        return std::make_shared<ReturnStatementAST>(value);
+        return MakeRef<ReturnStatementAST>(token.location, value);
     }
     else if (token.type == TokenType::If)
     {
@@ -96,19 +98,19 @@ ExpressionOrStatement Parser::ParseStatement()
         if (else_.type == TokenType::Identifier && else_.stringValue == "else")
         {
             auto elseBlock = ParseBlock();
-            return std::make_shared<IfStatementAST>(condition, block, elseBlock);
+            return MakeRef<IfStatementAST>(token.location, condition, block, elseBlock);
         }
         else
         {
             m_lexer.RollbackToken(else_);
         }
-        return std::make_shared<IfStatementAST>(condition, block, nullptr);
+        return MakeRef<IfStatementAST>(token.location, condition, block, nullptr);
     }
     else if (token.type == TokenType::While)
     {
         auto condition = ParseExpression();
         auto block = ParseBlock();
-        return std::make_shared<WhileStatementAST>(condition, block);
+        return MakeRef<WhileStatementAST>(token.location, condition, block);
     }
     else if (token.type == TokenType::Identifier)
     {
@@ -119,20 +121,20 @@ ExpressionOrStatement Parser::ParseStatement()
             auto equalsOrSemicolon = m_lexer.NextToken();
             if (equalsOrSemicolon.type == TokenType::Semicolon)
             {
-                return std::make_shared<VariableDefinitionAST>(token.stringValue, type, nullptr);
+                return MakeRef<VariableDefinitionAST>(token.location, token.stringValue, type, nullptr);
             }
             else
             {
                 auto initialValue = ParseExpression();
                 ExpectToken(TokenType::Semicolon);
-                return std::make_shared<VariableDefinitionAST>(token.stringValue, type, initialValue);
+                return MakeRef<VariableDefinitionAST>(token.location, token.stringValue, type, initialValue);
             }
         }
         else if (colonOrEquals.type == TokenType::Equals)
         {
             auto value = ParseExpression();
             ExpectToken(TokenType::Semicolon);
-            return std::make_shared<AssignmentStatementAST>(token.stringValue, value);
+            return MakeRef<AssignmentStatementAST>(colonOrEquals.location, token.stringValue, value);
         }
         else
         {
@@ -152,10 +154,17 @@ ExpressionOrStatement Parser::ParseStatement()
     }
 }
 
-std::shared_ptr<ExpressionAST> Parser::ParseExpression()
+struct OperationInfo
 {
-    std::stack<std::shared_ptr<ExpressionAST>> expressionStack;
-    std::stack<std::pair<BinaryOperation, int>> operationStack;
+    BinaryOperation operation;
+    int precedence;
+    Location location;
+};
+
+Ref<ExpressionAST> Parser::ParseExpression()
+{
+    std::stack<Ref<ExpressionAST>> expressionStack;
+    std::stack<OperationInfo> operationStack;
     int lastPrecedence = INT32_MAX;
 
     int parenCount = 0;
@@ -176,10 +185,10 @@ std::shared_ptr<ExpressionAST> Parser::ParseExpression()
     while(true)
     {
         auto operation = ParseOperation();
-        if(operation == BinaryOperation::_BinaryOperationCount)
+        if(operation.first == BinaryOperation::_BinaryOperationCount)
             break;
 
-        int precedence = BinaryOperationPrecedence[operation] + parenCount * 1000;
+        int precedence = BinaryOperationPrecedence[operation.first] + parenCount * 1000;
 
         {
             Token token = m_lexer.NextToken();
@@ -211,7 +220,7 @@ std::shared_ptr<ExpressionAST> Parser::ParseExpression()
             auto operator2 = operationStack.top();
             operationStack.pop();
 
-            lastPrecedence = operator2.second;
+            lastPrecedence = operator2.precedence;
 
             if (lastPrecedence < precedence)
             {
@@ -223,10 +232,10 @@ std::shared_ptr<ExpressionAST> Parser::ParseExpression()
             auto leftSide2 = expressionStack.top();
             expressionStack.pop();
 
-            expressionStack.push(std::make_shared<BinaryExpressionAST>(leftSide2, operator2.first, rightSide2));
+            expressionStack.push(MakeRef<BinaryExpressionAST>(operator2.location, leftSide2, operator2.operation, rightSide2));
         }
 
-        operationStack.push({ operation, precedence });
+        operationStack.push({ operation.first, precedence, operation.second });
         expressionStack.push(right_side);
 
         lastPrecedence = precedence;
@@ -252,25 +261,25 @@ std::shared_ptr<ExpressionAST> Parser::ParseExpression()
         auto leftSide2 = expressionStack.top();
         expressionStack.pop();
 
-        expressionStack.push(std::make_shared<BinaryExpressionAST>(leftSide2, operator2.first, rightSide2));
+        expressionStack.push(MakeRef<BinaryExpressionAST>(operator2.location, leftSide2, operator2.operation, rightSide2));
     }
 
     return expressionStack.top();
 }
 
-std::shared_ptr<ExpressionAST> Parser::ParsePrimary()
+Ref<ExpressionAST> Parser::ParsePrimary()
 {
     Token token = m_lexer.NextToken();
     if (token.type == TokenType::Number)
     {
-        return std::make_shared<NumberExpressionAST>(token.intValue, NumberType::Int32);
+        return MakeRef<NumberExpressionAST>(token.location, token.intValue, MakeRef<IntegerType>(32, true));
     }
     else if(token.type == TokenType::Identifier)
     {
         Token paren = m_lexer.NextToken();
         if (paren.type == TokenType::LParen)
         {
-            std::vector<std::shared_ptr<ExpressionAST>> args;
+            std::vector<Ref<ExpressionAST>> args;
             Token arg = m_lexer.NextToken();
             while(arg.type != TokenType::RParen)
             {
@@ -281,7 +290,7 @@ std::shared_ptr<ExpressionAST> Parser::ParsePrimary()
                 }
                 arg = m_lexer.NextToken();
             }
-            return std::make_shared<CallExpressionAST>(token.stringValue, args);
+            return MakeRef<CallExpressionAST>(token.location, token.stringValue, args);
         }
         else if (paren.type == TokenType::LessThan)
         {
@@ -290,72 +299,96 @@ std::shared_ptr<ExpressionAST> Parser::ParsePrimary()
             ExpectToken(TokenType::LParen);
             auto child = ParseExpression();
             ExpectToken(TokenType::RParen);
-            return std::make_shared<CastExpressionAST>(type, child);
+            return MakeRef<CastExpressionAST>(token.location, type, child);
         }
         else
         {
             m_lexer.RollbackToken(paren);
-            return std::make_shared<VariableExpressionAST>(token.stringValue);
+            return MakeRef<VariableExpressionAST>(token.location, token.stringValue);
         }
     }
     else if (token.type == TokenType::StringLiteral)
     {
-        return std::make_shared<StringLiteralAST>(token.stringValue);
+        return MakeRef<StringLiteralAST>(token.location, token.stringValue);
     }
     else
     {
-        g_context->Error(token.offset, "Unexpected token: %s", token.ToString().c_str());
+        g_context->Error(token.location, "Unexpected token: %s", token.ToString().c_str());
     }
 }
 
-BinaryOperation Parser::ParseOperation()
+std::pair<BinaryOperation, Location> Parser::ParseOperation()
 {
-    static_assert(static_cast<uint32_t>(BinaryOperation::_BinaryOperationCount) == 6, "Not all binary operations are handled in Parser::ParseOperation()");
+    static_assert(static_cast<uint32_t>(BinaryOperation::_BinaryOperationCount) == 10, "Not all binary operations are handled in Parser::ParseOperation()");
     
     Token token = m_lexer.NextToken();
     switch (token.type)
     {
         case TokenType::Plus:
-            return BinaryOperation::Add;
+            return { BinaryOperation::Add, token.location };
         case TokenType::Minus:
-            return BinaryOperation::Subtract;
+            return { BinaryOperation::Subtract, token.location };
         case TokenType::Asterisk:
-            return BinaryOperation::Multiply;
+            return { BinaryOperation::Multiply, token.location };
         case TokenType::Slash:
-            return BinaryOperation::Divide;
+            return { BinaryOperation::Divide, token.location };
         case TokenType::DoubleEquals:
-            return BinaryOperation::Equals;
+            return { BinaryOperation::Equals, token.location };
+        case TokenType::NotEqual:
+            return { BinaryOperation::NotEqual, token.location };
         case TokenType::GreaterThan:
-            return BinaryOperation::GreaterThan;
+            return { BinaryOperation::GreaterThan, token.location };
+        case TokenType::GreaterThanOrEqual:
+            return { BinaryOperation::GreaterThanOrEqual, token.location };
+        case TokenType::LessThan:
+            return { BinaryOperation::LessThan, token.location };
+        case TokenType::LessThanOrEqual:
+            return { BinaryOperation::LessThanOrEqual, token.location };
         default:
             m_lexer.RollbackToken(token);
-            return BinaryOperation::_BinaryOperationCount;
+            return { BinaryOperation::_BinaryOperationCount, token.location };
     }
 }
 
-llvm::Type* Parser::ParseType()
+Ref<Type> Parser::ParseType()
 {
     Token typeToken = m_lexer.NextToken();
     assert(typeToken.type == TokenType::Identifier);
-    llvm::Type* type;
+    Ref<Type> type;
     if (typeToken.stringValue == "int8" || typeToken.stringValue == "uint8")
-        type = reinterpret_cast<llvm::Type*>(llvm::Type::getInt8Ty(*g_context->llvmContext));
+        type = MakeRef<IntegerType>(8, typeToken.stringValue[0] != 'u');
     else if (typeToken.stringValue == "int16" || typeToken.stringValue == "uint16")
-        type = reinterpret_cast<llvm::Type*>(llvm::Type::getInt16Ty(*g_context->llvmContext));
+        type = MakeRef<IntegerType>(16, typeToken.stringValue[0] != 'u');
     else if (typeToken.stringValue == "int32" || typeToken.stringValue == "uint32")
-        type = reinterpret_cast<llvm::Type*>(llvm::Type::getInt32Ty(*g_context->llvmContext));
+        type = MakeRef<IntegerType>(32, typeToken.stringValue[0] != 'u');
     else if (typeToken.stringValue == "int64" || typeToken.stringValue == "uint64")
-        type = reinterpret_cast<llvm::Type*>(llvm::Type::getInt64Ty(*g_context->llvmContext));
+        type = MakeRef<IntegerType>(64, typeToken.stringValue[0] != 'u');
     else
-        g_context->Error(typeToken.offset, "Unexpected token: %s", typeToken.ToString().c_str());
+        g_context->Error(typeToken.location, "Unexpected token: %s", typeToken.ToString().c_str());
 
-    Token maybeStar = m_lexer.NextToken();
-    while (maybeStar.type == TokenType::Asterisk)
+    Token modifier = m_lexer.NextToken();
+    if (modifier.type == TokenType::Asterisk)
     {
-        type = type->getPointerTo();
-        maybeStar = m_lexer.NextToken();
+        assert(false);
+        while (modifier.type == TokenType::Asterisk)
+        {
+            // type = type->getPointerTo();
+            // modifier = m_lexer.NextToken();
+        }
+        m_lexer.RollbackToken(modifier);
     }
-    m_lexer.RollbackToken(maybeStar);
+    else if (modifier.type == TokenType::LSquareBracket)
+    {
+        assert(false);
+        auto size = m_lexer.NextToken();
+        assert(size.type == TokenType::Number);
+        ExpectToken(TokenType::RSquareBracket);
+        //type = llvm::ArrayType::get(type, size.intValue);
+    }
+    else
+    {
+        m_lexer.RollbackToken(modifier);
+    }
 
     return type;
 }
@@ -365,6 +398,6 @@ void Parser::ExpectToken(TokenType tokenType)
     Token token = m_lexer.NextToken();
     if (token.type != tokenType)
     {
-        g_context->Error(token.offset, "Unexpected token %s, expected %s", token.ToString().c_str(), TokenTypeToString(tokenType).c_str());
+        g_context->Error(token.location, "Unexpected token %s, expected %s", token.ToString().c_str(), TokenTypeToString(tokenType).c_str());
     }
 }
