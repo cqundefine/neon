@@ -96,6 +96,20 @@ std::pair<uint32_t, uint32_t> Context::LineColumnFromLocation(uint32_t location)
     exit(1);
 }
 
+void Context::Finalize()
+{
+    // auto functionType = llvm::FunctionType::get(llvm::Type::getVoidTy(*llvmContext), false);
+    // auto function = llvm::Function::Create(functionType, llvm::Function::LinkageTypes::ExternalLinkage, "_start", *module);
+
+    // auto block = llvm::BasicBlock::Create(*llvmContext, "entry", function);
+    // builder->SetInsertPoint(block);
+
+    // auto mainCall = builder->CreateCall(g_context->module->getFunction("main"), llvm::None, "maincall");
+    // auto intcast = builder->CreateIntCast(mainCall, llvm::Type::getInt64Ty(*llvmContext), false, "intcast");
+    // auto syscall1 = builder->CreateCall(g_context->module->getFunction("syscall1"), { llvm::ConstantInt::get(*llvmContext, llvm::APInt(64, 60, false)), mainCall }, "exitSyscall");   
+    // builder->CreateRetVoid();
+}
+
 void Context::Write(OutputFileType fileType)
 {
     auto sourceFilenameWithoutExtension = filename.substr(0, filename.length() - filename.substr(filename.find_last_of('.') + 1).length() - 1);

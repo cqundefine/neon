@@ -1,7 +1,7 @@
 #include <AST.h>
 
-void NumberExpressionAST::AdjustTypeToBits(uint32_t bits)
+void NumberExpressionAST::AdjustType(Ref<IntegerType> type)
 {
     // FIXME: Check if adjustment is correct
-    type->bits = bits;
+    this->type = type;
 }

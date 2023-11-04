@@ -13,7 +13,7 @@ void NumberExpressionAST::Dump(uint32_t indentCount) const
 void VariableExpressionAST::Dump(uint32_t indentCount) const
 {
     INDENT(indentCount);
-    printf("Variable Expression (`%s`)\n", name.c_str());
+    printf("Variable Expression (%s, %s)\n", name.c_str(), type->Dump().c_str());
 }
 
 void StringLiteralAST::Dump(uint32_t indentCount) const
@@ -47,6 +47,14 @@ void CastExpressionAST::Dump(uint32_t indentCount) const
     INDENT(indentCount);
     printf("Cast Expression (%s)\n", castedTo->Dump().c_str());
     child->Dump(indentCount + 1);
+}
+
+void ArrayAccessExpressionAST::Dump(uint32_t indentCount) const
+{
+    INDENT(indentCount);
+    printf("Array Access Expression (%s)\n", GetType()->Dump().c_str());
+    array->Dump(indentCount + 1);
+    index->Dump(indentCount + 1);
 }
 
 void ReturnStatementAST::Dump(uint32_t indentCount) const
@@ -94,13 +102,6 @@ void VariableDefinitionAST::Dump(uint32_t indentCount) const
     printf("Variable Declaration (`%s`, %s)\n", name.c_str(), type->Dump().c_str());
     if (initialValue != nullptr)
         initialValue->Dump(indentCount + 1);
-}
-
-void AssignmentStatementAST::Dump(uint32_t indentCount) const
-{
-    INDENT(indentCount);
-    printf("Assignment Statement (`%s`)\n", name.c_str());
-    value->Dump(indentCount + 1);
 }
 
 void FunctionAST::Dump(uint32_t indentCount) const

@@ -15,6 +15,11 @@ std::string StringType::Dump() const
     return "StringType";
 }
 
+std::string ArrayType::Dump() const
+{
+    return std::string("ArrayType (") + arrayType->Dump() + ", " + std::to_string(size) + ")"; 
+}
+
 // --------------------------
 // GetType
 // --------------------------
@@ -27,6 +32,11 @@ llvm::Type* IntegerType::GetType() const
 llvm::Type* StringType::GetType() const
 {
     return llvm::Type::getInt8PtrTy(*g_context->llvmContext);
+}
+
+llvm::Type* ArrayType::GetType() const
+{
+    return llvm::ArrayType::get(arrayType->GetType(), size);
 }
 
 // --------------------------
@@ -42,4 +52,10 @@ bool IntegerType::Equals(const Type& other) const
 bool StringType::Equals(const Type& other) const
 {
     return true;
+}
+
+bool ArrayType::Equals(const Type& other) const
+{
+    auto otherArray = reinterpret_cast<const ArrayType*>(&other);
+    return *arrayType == *otherArray->arrayType && size == otherArray->size;
 }

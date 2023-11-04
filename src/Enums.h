@@ -16,6 +16,8 @@ enum class BinaryOperation
     LessThan,
     LessThanOrEqual,
 
+    Assignment,
+
     _BinaryOperationCount
 };
 

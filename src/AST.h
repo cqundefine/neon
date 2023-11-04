@@ -16,7 +16,8 @@ enum class ExpressionType
     StringLiteral,
     Binary,
     Call,
-    Cast
+    Cast,
+    ArrayAccess
 };
 
 struct AST
@@ -45,24 +46,27 @@ struct NumberExpressionAST : public ExpressionAST
 
     inline NumberExpressionAST(Location location, uint64_t value, Ref<IntegerType> type) : ExpressionAST(location, ExpressionType::Number), value(value), type(type) {}
 
-    void AdjustTypeToBits(uint32_t bits);
+    void AdjustType(Ref<IntegerType> type);
 
     virtual void Dump(uint32_t indentCount) const override;
     virtual llvm::Value* Codegen() const override;
     virtual void Typecheck() const override;
-    virtual inline Ref<Type> GetType() const override { return type; };
+    virtual inline Ref<Type> GetType() const override { return type; }
 };
 
 struct VariableExpressionAST : public ExpressionAST
 {
     std::string name;
 
+    // Assigned during typechecking
+    mutable Ref<Type> type;
+
     inline VariableExpressionAST(Location location, const std::string& name) : ExpressionAST(location, ExpressionType::Variable), name(name) {}
 
     virtual void Dump(uint32_t indentCount) const override;
     virtual llvm::Value* Codegen() const override;
     virtual void Typecheck() const override;
-    virtual Ref<Type> GetType() const override;
+    virtual inline Ref<Type> GetType() const override { return type; }
 };
 
 struct StringLiteralAST : public ExpressionAST
@@ -74,7 +78,7 @@ struct StringLiteralAST : public ExpressionAST
     virtual void Dump(uint32_t indentCount) const override;
     virtual llvm::Value* Codegen() const override;
     virtual void Typecheck() const override;
-    virtual inline Ref<Type> GetType() const override { return MakeRef<StringType>(); };
+    virtual inline Ref<Type> GetType() const override { return MakeRef<StringType>(); }
 };
 
 struct BinaryExpressionAST : public ExpressionAST
@@ -88,20 +92,23 @@ struct BinaryExpressionAST : public ExpressionAST
     virtual void Dump(uint32_t indentCount) const override;
     virtual llvm::Value* Codegen() const override;
     virtual void Typecheck() const override;
-    virtual inline Ref<Type> GetType() const override { return lhs->GetType(); };
+    virtual inline Ref<Type> GetType() const override { return lhs->GetType(); }
 };
 
 struct CallExpressionAST : public ExpressionAST
 {
     std::string calleeName;
     std::vector<Ref<ExpressionAST>> args;
+
+    // Assigned during typechecking
+    mutable Ref<Type> returnedType;
     
     inline CallExpressionAST(Location location, std::string calleeName, std::vector<Ref<ExpressionAST>> args) : ExpressionAST(location, ExpressionType::Call), calleeName(calleeName), args(args) {}
     
     virtual void Dump(uint32_t indentCount) const override;
     virtual llvm::Value* Codegen() const override;
     virtual void Typecheck() const override;
-    virtual Ref<Type> GetType() const override;
+    virtual inline Ref<Type> GetType() const override { return returnedType; }
 };
 
 struct CastExpressionAST : public ExpressionAST
@@ -114,7 +121,20 @@ struct CastExpressionAST : public ExpressionAST
     virtual void Dump(uint32_t indentCount) const override;
     virtual llvm::Value* Codegen() const override;
     virtual void Typecheck() const override;
-    virtual inline Ref<Type> GetType() const override { return castedTo; };
+    virtual inline Ref<Type> GetType() const override { return castedTo; }
+};
+
+struct ArrayAccessExpressionAST : public ExpressionAST
+{
+    Ref<VariableExpressionAST> array;
+    Ref<NumberExpressionAST> index;
+    
+    inline ArrayAccessExpressionAST(Location location, Ref<VariableExpressionAST> array, Ref<NumberExpressionAST> index) : ExpressionAST(location, ExpressionType::ArrayAccess), array(array), index(index) {}
+
+    virtual void Dump(uint32_t indentCount) const override;
+    virtual llvm::Value* Codegen() const override;
+    virtual void Typecheck() const override;
+    virtual inline Ref<Type> GetType() const override { return StaticRefCast<ArrayType>(array->type)->arrayType; }
 };
 
 struct StatementAST : public AST
@@ -129,6 +149,9 @@ struct StatementAST : public AST
 struct ReturnStatementAST : public StatementAST
 {
     Ref<ExpressionAST> value;
+    
+    // Assigned during typechecking
+    mutable Ref<Type> returnedType;
     
     inline ReturnStatementAST(Location location, Ref<ExpressionAST> value) : StatementAST(location), value(value) {}
     
@@ -180,18 +203,6 @@ struct VariableDefinitionAST : public StatementAST
     Ref<ExpressionAST> initialValue;
 
     inline VariableDefinitionAST(Location location, const std::string& name, Ref<Type> type, Ref<ExpressionAST> initialValue) : StatementAST(location), name(name), type(type), initialValue(initialValue) {}
-
-    virtual void Dump(uint32_t indentCount) const override;
-    virtual void Codegen() const override;
-    virtual void Typecheck() const override;
-};
-
-struct AssignmentStatementAST : public StatementAST
-{
-    std::string name;
-    Ref<ExpressionAST> value;
-
-    inline AssignmentStatementAST(Location location, std::string name, Ref<ExpressionAST> value) : StatementAST(location), name(name), value(value) {}
 
     virtual void Dump(uint32_t indentCount) const override;
     virtual void Codegen() const override;

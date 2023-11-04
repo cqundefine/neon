@@ -114,8 +114,8 @@ ExpressionOrStatement Parser::ParseStatement()
     }
     else if (token.type == TokenType::Identifier)
     {
-        Token colonOrEquals = m_lexer.NextToken();
-        if (colonOrEquals.type == TokenType::Colon)
+        Token colon = m_lexer.NextToken();
+        if (colon.type == TokenType::Colon)
         {
             auto type = ParseType();
             auto equalsOrSemicolon = m_lexer.NextToken();
@@ -130,17 +130,11 @@ ExpressionOrStatement Parser::ParseStatement()
                 return MakeRef<VariableDefinitionAST>(token.location, token.stringValue, type, initialValue);
             }
         }
-        else if (colonOrEquals.type == TokenType::Equals)
-        {
-            auto value = ParseExpression();
-            ExpectToken(TokenType::Semicolon);
-            return MakeRef<AssignmentStatementAST>(colonOrEquals.location, token.stringValue, value);
-        }
         else
         {
-            m_lexer.RollbackToken(colonOrEquals);
+            m_lexer.RollbackToken(colon);
             m_lexer.RollbackToken(token);
-            auto expression = ParsePrimary();
+            auto expression = ParseExpression();
             ExpectToken(TokenType::Semicolon);
             return expression;
         }
@@ -148,7 +142,7 @@ ExpressionOrStatement Parser::ParseStatement()
     else
     {
         m_lexer.RollbackToken(token);
-        auto expression = ParsePrimary();
+        auto expression = ParseExpression();
         ExpectToken(TokenType::Semicolon);
         return expression;
     }
@@ -303,8 +297,16 @@ Ref<ExpressionAST> Parser::ParsePrimary()
         }
         else
         {
+            auto var = MakeRef<VariableExpressionAST>(token.location, token.stringValue);
+            if (paren.type == TokenType::LSquareBracket)
+            {
+                auto index = ParsePrimary();
+                assert(index->type == ExpressionType::Number);
+                ExpectToken(TokenType::RSquareBracket);
+                return MakeRef<ArrayAccessExpressionAST>(paren.location, var, std::static_pointer_cast<NumberExpressionAST>(index));
+            }
             m_lexer.RollbackToken(paren);
-            return MakeRef<VariableExpressionAST>(token.location, token.stringValue);
+            return var;
         }
     }
     else if (token.type == TokenType::StringLiteral)
@@ -319,7 +321,7 @@ Ref<ExpressionAST> Parser::ParsePrimary()
 
 std::pair<BinaryOperation, Location> Parser::ParseOperation()
 {
-    static_assert(static_cast<uint32_t>(BinaryOperation::_BinaryOperationCount) == 10, "Not all binary operations are handled in Parser::ParseOperation()");
+    static_assert(static_cast<uint32_t>(BinaryOperation::_BinaryOperationCount) == 11, "Not all binary operations are handled in Parser::ParseOperation()");
     
     Token token = m_lexer.NextToken();
     switch (token.type)
@@ -344,6 +346,8 @@ std::pair<BinaryOperation, Location> Parser::ParseOperation()
             return { BinaryOperation::LessThan, token.location };
         case TokenType::LessThanOrEqual:
             return { BinaryOperation::LessThanOrEqual, token.location };
+        case TokenType::Equals:
+            return { BinaryOperation::Assignment, token.location };
         default:
             m_lexer.RollbackToken(token);
             return { BinaryOperation::_BinaryOperationCount, token.location };
@@ -379,11 +383,10 @@ Ref<Type> Parser::ParseType()
     }
     else if (modifier.type == TokenType::LSquareBracket)
     {
-        assert(false);
         auto size = m_lexer.NextToken();
         assert(size.type == TokenType::Number);
         ExpectToken(TokenType::RSquareBracket);
-        //type = llvm::ArrayType::get(type, size.intValue);
+        return MakeRef<ArrayType>(type, size.intValue);
     }
     else
     {

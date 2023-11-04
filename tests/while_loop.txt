@@ -1,3 +1,4 @@
+:i builds 1
 :i argc 0
 :b stdin 0
 

@@ -62,18 +62,20 @@ def write_blob_field(f: BinaryIO, name: bytes, blob: bytes):
 
 @dataclass
 class TestCase:
+    builds: bool
     argv: List[str]
     stdin: bytes
     returncode: int
     stdout: bytes
     stderr: bytes
 
-DEFAULT_TEST_CASE=TestCase(argv=[], stdin=bytes(), returncode=0, stdout=bytes(), stderr=bytes())
+DEFAULT_TEST_CASE=TestCase(builds=True, argv=[], stdin=bytes(), returncode=0, stdout=bytes(), stderr=bytes())
 
 def load_test_case(file_path: str) -> Optional[TestCase]:
     try:
         with open(file_path, "rb") as f:
             argv = []
+            builds = bool(read_int_field(f, b'builds'))
             argc = read_int_field(f, b'argc')
             for index in range(argc):
                 argv.append(read_blob_field(f, b'arg%d' % index).decode('utf-8'))
@@ -81,14 +83,16 @@ def load_test_case(file_path: str) -> Optional[TestCase]:
             returncode = read_int_field(f, b'returncode')
             stdout = read_blob_field(f, b'stdout')
             stderr = read_blob_field(f, b'stderr')
-            return TestCase(argv, stdin, returncode, stdout, stderr)
+            return TestCase(builds, argv, stdin, returncode, stdout, stderr)
     except FileNotFoundError:
         return None
 
 def save_test_case(file_path: str,
+                   builds: bool,
                    argv: List[str], stdin: bytes,
                    returncode: int, stdout: bytes, stderr: bytes):
     with open(file_path, "wb") as f:
+        write_int_field(f, b'builds', int(builds))
         write_int_field(f, b'argc', len(argv))
         for index, arg in enumerate(argv):
             write_blob_field(f, b'arg%d' % index, arg.encode('utf-8'))
@@ -115,11 +119,16 @@ def run_test_for_file(file_path: str, stats: RunStats = RunStats()):
     error = False
 
     if tc is not None:
-        comp = cmd_run_echoed(["build/Neon", file_path, "exe", *tc.argv], input=tc.stdin, capture_output=True)
-        if comp.returncode != 0:
+        comp = cmd_run_echoed(["build/Neon", file_path, "exe", *tc.argv], input=tc.stdin)
+        if (comp.returncode != 0 and tc.builds) or (comp.returncode == 0 and not tc.builds):
             error = True
             stats.failed += 1
-        else:
+            print("[ERROR] Unexpected build result")
+            print("  Expected:")
+            print("    builds: %r" % tc.builds)
+            print("  Actual:")
+            print("    builds: %r" % bool(comp.returncode == 0))
+        elif tc.builds:
             com = cmd_run_echoed([file_path[:-len(NEON_EXT)]], input=tc.stdin, capture_output=True)
             if com.returncode != tc.returncode or com.stdout != tc.stdout or com.stderr != tc.stderr:
                 print("[ERROR] Unexpected output")
@@ -170,6 +179,7 @@ def update_input_for_file(file_path: str, argv: List[str]):
 
     print("[INFO] Saving input to %s" % tc_path)
     save_test_case(tc_path,
+                   tc.builds,
                    argv, stdin,
                    tc.returncode, tc.stdout, tc.stderr)
 
@@ -177,12 +187,20 @@ def update_output_for_file(file_path: str):
     tc_path = file_path[:-len(NEON_EXT)] + ".txt"
     tc = load_test_case(tc_path) or DEFAULT_TEST_CASE
 
-    outputcomp = cmd_run_echoed(["build/Neon", file_path, "exe", *tc.argv], input=tc.stdin, capture_output=True)
-    output = cmd_run_echoed([file_path[:-len(NEON_EXT)]], input=tc.stdin, capture_output=True)
-    print("[INFO] Saving output to %s" % tc_path)
-    save_test_case(tc_path,
-                   tc.argv, tc.stdin,
-                   output.returncode, output.stdout, output.stderr)
+    outputcomp = cmd_run_echoed(["build/Neon", file_path, "exe", *tc.argv], input=tc.stdin)
+    if outputcomp.returncode == 0:
+        output = cmd_run_echoed([file_path[:-len(NEON_EXT)]], input=tc.stdin, capture_output=True)
+        print("[INFO] Saving output to %s" % tc_path)
+        save_test_case(tc_path,
+                    True,
+                    tc.argv, tc.stdin,
+                    output.returncode, output.stdout, output.stderr)
+    else:
+        save_test_case(tc_path,
+                    False,
+                    tc.argv, tc.stdin,
+                    tc.returncode, tc.stdout, tc.stderr)
+
 
 def update_output_for_folder(folder: str):
     for entry in os.scandir(folder):
@@ -267,14 +285,9 @@ if __name__ == '__main__':
         else:
             # TODO: `./test.py run non-existing-file` fails with 'unreachable'
             assert False, 'unreachable'
-    elif subcommand == 'full' or subcommand == 'all':
-        cmd_run_echoed(['mypy', './test.py'])
-        run_test_for_folder('./tests/')
-        run_test_for_folder('./examples/')
-        run_test_for_folder('./euler/')
     elif subcommand == 'help':
         usage(exe_name)
     else:
         usage(exe_name)
         print("[ERROR] unknown subcommand `%s`" % subcommand, file=sys.stderr)
-        exit(1);
+        exit(1)

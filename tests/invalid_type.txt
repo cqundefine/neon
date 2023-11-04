@@ -1,8 +1,8 @@
-:i builds 1
+:i builds 0
 :i argc 0
 :b stdin 0
 
-:i returncode 20
+:i returncode 0
 :b stdout 0
 
 :b stderr 0

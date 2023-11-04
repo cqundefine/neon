@@ -30,17 +30,36 @@ llvm::Value* StringLiteralAST::Codegen() const
 
 llvm::Value* BinaryExpressionAST::Codegen() const
 {
-    static_assert(static_cast<uint32_t>(BinaryOperation::_BinaryOperationCount) == 10, "Not all binary operations are handled in BinaryExpressionAST::Codegen()");
+    static_assert(static_cast<uint32_t>(BinaryOperation::_BinaryOperationCount) == 11, "Not all binary operations are handled in BinaryExpressionAST::Codegen()");
 
-    if(lhs->GetType()->type == TypeEnum::Integer && rhs->GetType()->type == TypeEnum::Integer)
+    if (binaryOperation == BinaryOperation::Assignment)
+    {
+        if(lhs->type == ExpressionType::Variable)
+        {
+            auto variableLHS = StaticRefCast<VariableExpressionAST>(lhs);
+            g_context->builder->CreateStore(rhs->Codegen(), allocas[variableLHS->name]);
+        }
+        else if(lhs->type == ExpressionType::ArrayAccess)
+        {
+            auto arrayLHS = StaticRefCast<ArrayAccessExpressionAST>(lhs);
+            auto gep = g_context->builder->CreateGEP(allocas[arrayLHS->array->name]->getAllocatedType(), allocas[arrayLHS->array->name], arrayLHS->index->Codegen(), "gep");
+            g_context->builder->CreateStore(rhs->Codegen(), gep);
+        }
+        else
+        {
+            assert(false);
+        }
+        return nullptr;
+        //return lhs->Codegen();
+    }
+    else if(lhs->GetType()->type == TypeEnum::Integer && rhs->GetType()->type == TypeEnum::Integer)
     {
         assert(*lhs->GetType() == *rhs->GetType());
         
-        auto lhsInt = reinterpret_cast<NumberExpressionAST*>(lhs.get());
-        auto rhsInt = reinterpret_cast<NumberExpressionAST*>(rhs.get());
+        auto isLHSSigned = StaticRefCast<IntegerType>(lhs->GetType())->isSigned;
 
         auto lhsCodegenned = lhs->Codegen();
-        auto rhsCodegenned = g_context->builder->CreateIntCast(rhs->Codegen(), lhsCodegenned->getType(), lhsInt->type->isSigned, "bincast");
+        auto rhsCodegenned = g_context->builder->CreateIntCast(rhs->Codegen(), lhsCodegenned->getType(), isLHSSigned, "intcast");
 
         switch(binaryOperation)
         {
@@ -51,7 +70,7 @@ llvm::Value* BinaryExpressionAST::Codegen() const
             case BinaryOperation::Multiply:
                 return g_context->builder->CreateMul(lhsCodegenned, rhsCodegenned, "mul");
             case BinaryOperation::Divide:
-                if (lhsInt->type->isSigned)
+                if (isLHSSigned)
                     return g_context->builder->CreateSDiv(lhsCodegenned, rhsCodegenned, "div");
                 else
                     return g_context->builder->CreateUDiv(lhsCodegenned, rhsCodegenned, "div");
@@ -60,22 +79,22 @@ llvm::Value* BinaryExpressionAST::Codegen() const
             case BinaryOperation::NotEqual:
                 return g_context->builder->CreateICmpNE(lhsCodegenned, rhsCodegenned, "ne");
             case BinaryOperation::GreaterThan:
-                if (lhsInt->type->isSigned)
+                if (isLHSSigned)
                     return g_context->builder->CreateICmpSGT(lhsCodegenned, rhsCodegenned, "gt");
                 else
                     return g_context->builder->CreateICmpUGT(lhsCodegenned, rhsCodegenned, "gt");
             case BinaryOperation::GreaterThanOrEqual:
-                if (lhsInt->type->isSigned)
+                if (isLHSSigned)
                     return g_context->builder->CreateICmpSGE(lhsCodegenned, rhsCodegenned, "ge");
                 else
                     return g_context->builder->CreateICmpUGE(lhsCodegenned, rhsCodegenned, "ge");
             case BinaryOperation::LessThan:
-                if (lhsInt->type->isSigned)
+                if (isLHSSigned)
                     return g_context->builder->CreateICmpSLT(lhsCodegenned, rhsCodegenned, "lt");
                 else
                     return g_context->builder->CreateICmpULT(lhsCodegenned, rhsCodegenned, "lt");
             case BinaryOperation::LessThanOrEqual:
-                if (lhsInt->type->isSigned)
+                if (isLHSSigned)
                     return g_context->builder->CreateICmpSLE(lhsCodegenned, rhsCodegenned, "le");
                 else
                     return g_context->builder->CreateICmpULE(lhsCodegenned, rhsCodegenned, "le");
@@ -108,9 +127,18 @@ llvm::Value* CastExpressionAST::Codegen() const
     return g_context->builder->CreateIntCast(child->Codegen(), numberType->GetType(), numberType->isSigned, "cast");
 }
 
+llvm::Value* ArrayAccessExpressionAST::Codegen() const
+{
+    auto gep = g_context->builder->CreateGEP(allocas[array->name]->getAllocatedType(), allocas[array->name], index->Codegen(), "gep");
+    return g_context->builder->CreateLoad(StaticRefCast<ArrayType>(array->GetType())->arrayType->GetType(), gep, array->name);
+}
+
 void ReturnStatementAST::Codegen() const
 {
-    g_context->builder->CreateRet(value->Codegen());
+    if (value->GetType()->type == TypeEnum::Integer)
+        g_context->builder->CreateRet(g_context->builder->CreateIntCast(value->Codegen(), returnedType->GetType(), StaticRefCast<IntegerType>(returnedType)->isSigned, "bincast"));
+    else
+        g_context->builder->CreateRet(value->Codegen());
 }
 
 void BlockAST::Codegen() const
@@ -185,14 +213,10 @@ void VariableDefinitionAST::Codegen() const
 {
     auto parentFunction = g_context->builder->GetInsertBlock()->getParent();
     llvm::IRBuilder<> functionBeginBuilder(&parentFunction->getEntryBlock(), parentFunction->getEntryBlock().begin());
-    allocas[name] = functionBeginBuilder.CreateAlloca(type->GetType(), nullptr, name);
+    auto size = type->type == TypeEnum::Array ? llvm::ConstantInt::get(*g_context->llvmContext, llvm::APInt(64, StaticRefCast<ArrayType>(type)->size)) : nullptr;
+    allocas[name] = functionBeginBuilder.CreateAlloca(type->GetType(), size, name);
     if (initialValue != nullptr)
         g_context->builder->CreateStore(initialValue->Codegen(), allocas[name]);
-}
-
-void AssignmentStatementAST::Codegen() const
-{
-    g_context->builder->CreateStore(value->Codegen(), allocas[name]);
 }
 
 llvm::Function* FunctionAST::Codegen() const
@@ -213,7 +237,7 @@ llvm::Function* FunctionAST::Codegen() const
 
         llvm::verifyFunction(*function);
 
-        g_context->functionPassManager->run(*function);
+        // g_context->functionPassManager->run(*function);
     }
 
     return function;

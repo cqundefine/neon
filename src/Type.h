@@ -1,11 +1,13 @@
 #pragma once
 
 #include <llvm/IR/Type.h>
+#include <Utils.h>
 
 enum TypeEnum
 {
     Integer,
-    String
+    String,
+    Array
 };
 
 struct Type
@@ -41,6 +43,18 @@ struct IntegerType : public Type
 struct StringType : public Type
 {
     inline StringType() : Type(TypeEnum::String) {}
+
+    virtual llvm::Type* GetType() const override;
+    virtual std::string Dump() const override;
+    virtual bool Equals(const Type& other) const override;
+};
+
+struct ArrayType : public Type
+{
+    Ref<Type> arrayType;
+    uint64_t size;
+
+    inline ArrayType(Ref<Type> arrayType, uint64_t size) : Type(TypeEnum::Array), arrayType(arrayType), size(size) {}
 
     virtual llvm::Type* GetType() const override;
     virtual std::string Dump() const override;
