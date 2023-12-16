@@ -180,6 +180,30 @@ Token Lexer::NextToken() const
     {
         uint32_t trueBeginIndex = m_index;
         std::string numberString;
+        int base = 10;
+        if (g_context->fileContent[m_index] == '0')
+        {
+            m_index++;
+            if (g_context->fileContent[m_index] == 'x')
+            {
+                m_index++;
+                base = 16;
+            }
+            else if (g_context->fileContent[m_index] == 'b')
+            {
+                m_index++;
+                base = 2;
+            }
+            else if (g_context->fileContent[m_index] == 'o')
+            {
+                m_index++;
+                base = 8;
+            }
+            else
+            {
+                m_index--;
+            }
+        }
         do {
             numberString += g_context->fileContent[m_index];
             m_index++;
@@ -187,7 +211,7 @@ Token Lexer::NextToken() const
 
         return {
             .type = TokenType::Number,
-            .intValue = std::strtoull(numberString.c_str(), 0, 10),
+            .intValue = std::strtoull(numberString.c_str(), 0, base),
             .length = m_index - beginIndex,
             .location = trueBeginIndex
         };
