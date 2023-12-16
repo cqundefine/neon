@@ -17,7 +17,8 @@ enum class ExpressionType
     Binary,
     Call,
     Cast,
-    ArrayAccess
+    ArrayAccess,
+    Dereference
 };
 
 struct AST
@@ -135,6 +136,23 @@ struct ArrayAccessExpressionAST : public ExpressionAST
     virtual llvm::Value* Codegen() const override;
     virtual void Typecheck() const override;
     virtual inline Ref<Type> GetType() const override { return StaticRefCast<ArrayType>(array->type)->arrayType; }
+};
+
+struct DereferenceExpressionAST : public ExpressionAST
+{
+    Ref<VariableExpressionAST> pointer;
+    
+    inline DereferenceExpressionAST(Location location, Ref<VariableExpressionAST> pointer) : ExpressionAST(location, ExpressionType::Dereference), pointer(pointer) {}
+
+    virtual void Dump(uint32_t indentCount) const override;
+    virtual llvm::Value* Codegen() const override;
+    virtual void Typecheck() const override;
+    virtual inline Ref<Type> GetType() const override 
+    {
+        // This should get cought by the typechecker
+        assert(pointer->type->type == TypeEnum::Pointer); 
+        return StaticRefCast<PointerType>(pointer->type)->underlayingType;
+    }
 };
 
 struct StatementAST : public AST

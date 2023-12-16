@@ -50,7 +50,10 @@ void BinaryExpressionAST::Typecheck() const
     if(*lhs->GetType() != *rhs->GetType())
         g_context->Error(location, "Wrong binary operation: %s with type %s", lhs->GetType()->Dump().c_str(), rhs->GetType()->Dump().c_str());
     
-    // Check if variable exists in the current scope
+    if(binaryOperation == BinaryOperation::Assignment && lhs->type != ExpressionType::Variable && lhs->type != ExpressionType::ArrayAccess && lhs->type != ExpressionType::Dereference)
+        g_context->Error(location, "Can't assign to non-variable expression");
+
+    // FIXME: Check if variable exists in the current scope
 }
 
 void CallExpressionAST::Typecheck() const
@@ -83,6 +86,14 @@ void ArrayAccessExpressionAST::Typecheck() const
 {
     array->Typecheck();
     index->Typecheck();
+}
+
+void DereferenceExpressionAST::Typecheck() const
+{
+    pointer->Typecheck();
+
+    if (pointer->type->type != TypeEnum::Pointer)
+        g_context->Error(location, "Can't dereference non-pointer type: %s", pointer->type->Dump().c_str());
 }
 
 void ReturnStatementAST::Typecheck() const

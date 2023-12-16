@@ -57,6 +57,13 @@ void ArrayAccessExpressionAST::Dump(uint32_t indentCount) const
     index->Dump(indentCount + 1);
 }
 
+void DereferenceExpressionAST::Dump(uint32_t indentCount) const
+{
+    INDENT(indentCount);
+    printf("Dereference Expression (%s)\n", GetType()->Dump().c_str());
+    pointer->Dump(indentCount + 1);
+}
+
 void ReturnStatementAST::Dump(uint32_t indentCount) const
 {
     INDENT(indentCount);
@@ -108,6 +115,8 @@ void FunctionAST::Dump(uint32_t indentCount) const
 {
     INDENT(indentCount);
     printf("Function (`%s`)\n", name.c_str());
+    INDENT(indentCount + 1);
+    printf("Return Type: %s\n", returnType->Dump().c_str());
     for (const auto& param : params)
     {
         INDENT(indentCount + 1);

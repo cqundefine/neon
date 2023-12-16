@@ -18,7 +18,7 @@ private:
     Ref<ExpressionAST> ParseExpression();
     Ref<ExpressionAST> ParsePrimary();
     std::pair<BinaryOperation, Location> ParseOperation();
-    Ref<Type> ParseType();
+    Ref<Type> ParseType(bool allowVoid = false);
 
     void ExpectToken(TokenType tokenType);
 

@@ -3,11 +3,13 @@
 #include <llvm/IR/Type.h>
 #include <Utils.h>
 
-enum TypeEnum
+enum class TypeEnum
 {
     Integer,
     String,
-    Array
+    Array,
+    Pointer,
+    Void
 };
 
 struct Type
@@ -55,6 +57,26 @@ struct ArrayType : public Type
     uint64_t size;
 
     inline ArrayType(Ref<Type> arrayType, uint64_t size) : Type(TypeEnum::Array), arrayType(arrayType), size(size) {}
+
+    virtual llvm::Type* GetType() const override;
+    virtual std::string Dump() const override;
+    virtual bool Equals(const Type& other) const override;
+};
+
+struct PointerType : public Type
+{
+    Ref<Type> underlayingType;
+
+    inline PointerType(Ref<Type> underlayingType) : Type(TypeEnum::Pointer), underlayingType(underlayingType) {}
+
+    virtual llvm::Type* GetType() const override;
+    virtual std::string Dump() const override;
+    virtual bool Equals(const Type& other) const override;
+};
+
+struct VoidType : public Type
+{
+    inline VoidType() : Type(TypeEnum::Void) {}
 
     virtual llvm::Type* GetType() const override;
     virtual std::string Dump() const override;

@@ -8,9 +8,10 @@ Ref<ParsedFile> Parser::Parse()
     while (true)
     {
         auto token = m_lexer.NextToken();
-        if (token.type == TokenType::Extern)
+        if (token.type == TokenType::Extern || token.type == TokenType::Function)
         {
-            ExpectToken(TokenType::Function);
+            if (token.type == TokenType::Extern)
+                ExpectToken(TokenType::Function);
             auto nameToken = m_lexer.NextToken();
             assert(nameToken.type == TokenType::Identifier);
             ExpectToken(TokenType::LParen);
@@ -36,20 +37,15 @@ Ref<ParsedFile> Parser::Parse()
 
             ExpectToken(TokenType::RParen);
             ExpectToken(TokenType::Colon);
-            ExpectToken(TokenType::Identifier);
-            ExpectToken(TokenType::Semicolon);
-            functions.push_back(MakeRef<FunctionAST>(token.location, nameToken.stringValue, params, MakeRef<IntegerType>(32, true), nullptr));
-        }
-        else if (token.type == TokenType::Function)
-        {
-            auto nameToken = m_lexer.NextToken();
-            assert(nameToken.type == TokenType::Identifier);
-            ExpectToken(TokenType::LParen);
-            ExpectToken(TokenType::RParen);
-            ExpectToken(TokenType::Colon);
-            ExpectToken(TokenType::Identifier);
-            std::vector<FunctionAST::Param> params;
-            functions.push_back(MakeRef<FunctionAST>(token.location, nameToken.stringValue, params, MakeRef<IntegerType>(32, true), ParseBlock()));
+            
+            auto returnType = ParseType(true);
+            
+            Ref<BlockAST> block;
+            if (token.type == TokenType::Extern)
+                ExpectToken(TokenType::Semicolon);
+            else
+                block = ParseBlock();
+            functions.push_back(MakeRef<FunctionAST>(token.location, nameToken.stringValue, params, returnType, block));
         }
         else if (token.type == TokenType::Eof)
         {
@@ -313,6 +309,13 @@ Ref<ExpressionAST> Parser::ParsePrimary()
     {
         return MakeRef<StringLiteralAST>(token.location, token.stringValue);
     }
+    else if (token.type == TokenType::Asterisk)
+    {
+        auto child = ParsePrimary();
+        if (child->type != ExpressionType::Variable)
+            g_context->Error(token.location, "Can't dereference this expression");
+        return MakeRef<DereferenceExpressionAST>(token.location, StaticRefCast<VariableExpressionAST>(child));
+    }
     else
     {
         g_context->Error(token.location, "Unexpected token: %s", token.ToString().c_str());
@@ -354,7 +357,7 @@ std::pair<BinaryOperation, Location> Parser::ParseOperation()
     }
 }
 
-Ref<Type> Parser::ParseType()
+Ref<Type> Parser::ParseType(bool allowVoid)
 {
     Token typeToken = m_lexer.NextToken();
     assert(typeToken.type == TokenType::Identifier);
@@ -367,17 +370,22 @@ Ref<Type> Parser::ParseType()
         type = MakeRef<IntegerType>(32, typeToken.stringValue[0] != 'u');
     else if (typeToken.stringValue == "int64" || typeToken.stringValue == "uint64")
         type = MakeRef<IntegerType>(64, typeToken.stringValue[0] != 'u');
+    else if (typeToken.stringValue == "void")
+    {
+        if (!allowVoid)
+            g_context->Error(typeToken.location, "void is not allowed here");
+        type = MakeRef<VoidType>();
+    }
     else
         g_context->Error(typeToken.location, "Unexpected token: %s", typeToken.ToString().c_str());
 
     Token modifier = m_lexer.NextToken();
     if (modifier.type == TokenType::Asterisk)
     {
-        assert(false);
         while (modifier.type == TokenType::Asterisk)
         {
-            // type = type->getPointerTo();
-            // modifier = m_lexer.NextToken();
+            type = MakeRef<PointerType>(type);
+            modifier = m_lexer.NextToken();
         }
         m_lexer.RollbackToken(modifier);
     }

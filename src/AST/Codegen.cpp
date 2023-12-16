@@ -45,6 +45,11 @@ llvm::Value* BinaryExpressionAST::Codegen() const
             auto gep = g_context->builder->CreateGEP(allocas[arrayLHS->array->name]->getAllocatedType(), allocas[arrayLHS->array->name], arrayLHS->index->Codegen(), "gep");
             g_context->builder->CreateStore(rhs->Codegen(), gep);
         }
+        else if(lhs->type == ExpressionType::Dereference)
+        {
+            auto dereferenceLHS = StaticRefCast<DereferenceExpressionAST>(lhs);
+            g_context->builder->CreateStore(rhs->Codegen(), dereferenceLHS->pointer->Codegen());
+        }
         else
         {
             assert(false);
@@ -131,6 +136,11 @@ llvm::Value* ArrayAccessExpressionAST::Codegen() const
 {
     auto gep = g_context->builder->CreateGEP(allocas[array->name]->getAllocatedType(), allocas[array->name], index->Codegen(), "gep");
     return g_context->builder->CreateLoad(StaticRefCast<ArrayType>(array->GetType())->arrayType->GetType(), gep, array->name);
+}
+
+llvm::Value* DereferenceExpressionAST::Codegen() const
+{
+    return g_context->builder->CreateLoad(StaticRefCast<PointerType>(pointer->GetType())->underlayingType->GetType(), pointer->Codegen(), pointer->name);
 }
 
 void ReturnStatementAST::Codegen() const
@@ -225,7 +235,7 @@ llvm::Function* FunctionAST::Codegen() const
     for (const auto& param : params)
         llvmParams.push_back(param.type->GetType());
 
-    auto functionType = llvm::FunctionType::get(llvm::Type::getInt32Ty(*g_context->llvmContext), llvmParams, false);
+    auto functionType = llvm::FunctionType::get(returnType->GetType(), llvmParams, false);
     auto function = llvm::Function::Create(functionType, llvm::Function::ExternalLinkage, name, g_context->module.get());
     
     if (block != nullptr)

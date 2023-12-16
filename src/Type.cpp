@@ -20,6 +20,16 @@ std::string ArrayType::Dump() const
     return std::string("ArrayType (") + arrayType->Dump() + ", " + std::to_string(size) + ")"; 
 }
 
+std::string PointerType::Dump() const
+{
+    return std::string("PointerType (") + underlayingType->Dump() + ")"; 
+}
+
+std::string VoidType::Dump() const
+{
+    return "VoidType";
+}
+
 // --------------------------
 // GetType
 // --------------------------
@@ -37,6 +47,16 @@ llvm::Type* StringType::GetType() const
 llvm::Type* ArrayType::GetType() const
 {
     return llvm::ArrayType::get(arrayType->GetType(), size);
+}
+
+llvm::Type* PointerType::GetType() const
+{
+    return llvm::PointerType::get(underlayingType->GetType(), 0);
+}
+
+llvm::Type* VoidType::GetType() const
+{
+    return llvm::Type::getVoidTy(*g_context->llvmContext);
 }
 
 // --------------------------
@@ -58,4 +78,16 @@ bool ArrayType::Equals(const Type& other) const
 {
     auto otherArray = reinterpret_cast<const ArrayType*>(&other);
     return *arrayType == *otherArray->arrayType && size == otherArray->size;
+}
+
+bool PointerType::Equals(const Type& other) const
+{
+    auto otherPointer = reinterpret_cast<const PointerType*>(&other);
+    return *underlayingType == *otherPointer->underlayingType;
+}
+
+bool VoidType::Equals(const Type& other) const
+{
+    // FIXME: Figure out if we should ever compare void types
+    return true;
 }
