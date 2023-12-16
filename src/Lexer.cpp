@@ -74,6 +74,21 @@ Token Lexer::NextToken() const
     else if (g_context->fileContent[m_index] == '/')
     {
         m_index++;
+        if (g_context->fileContent[m_index] == '/')
+        {
+            m_index++;
+            while(g_context->fileContent[m_index] != '\n')
+                m_index++;
+            return NextToken();
+        }
+        else if (g_context->fileContent[m_index] == '*')
+        {
+            m_index++;
+            while(!(g_context->fileContent[m_index] == '*' && g_context->fileContent[m_index + 1] == '/'))
+                m_index++;
+            m_index += 2;
+            return NextToken();
+        }
         return { .type = TokenType::Slash, .length = m_index - beginIndex, .location = m_index - 1 };
     }
     else if (g_context->fileContent[m_index] == ',')
