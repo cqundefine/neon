@@ -64,6 +64,13 @@ void DereferenceExpressionAST::Dump(uint32_t indentCount) const
     pointer->Dump(indentCount + 1);
 }
 
+void MemberAccessExpressionAST::Dump(uint32_t indentCount) const
+{
+    INDENT(indentCount);
+    printf("Member Access Expression (`%s`, %s)\n", memberName.c_str(), GetType()->Dump().c_str());
+    object->Dump(indentCount + 1);
+}
+
 void ReturnStatementAST::Dump(uint32_t indentCount) const
 {
     INDENT(indentCount);

@@ -3,7 +3,7 @@
 
 std::string TokenTypeToString(TokenType tokenType)
 {
-    static_assert(static_cast<uint32_t>(TokenType::_TokenTypeCount) == 30, "Not all tokens are handled in Token::ToString()");
+    static_assert(static_cast<uint32_t>(TokenType::_TokenTypeCount) == 31, "Not all tokens are handled in Token::ToString()");
 
     switch (tokenType)
     {
@@ -57,6 +57,8 @@ std::string TokenTypeToString(TokenType tokenType)
             return "LessThanOrEqual";
         case TokenType::ExclamationMark:
             return "ExclamationMark";
+        case TokenType::Dot:
+            return "Dot";
         case TokenType::Function:
             return "Function";
         case TokenType::Return:
@@ -74,7 +76,7 @@ std::string TokenTypeToString(TokenType tokenType)
 
 std::string Token::ToString()
 {
-    static_assert(static_cast<uint32_t>(TokenType::_TokenTypeCount) == 30, "Not all tokens are handled in Token::ToString()");
+    static_assert(static_cast<uint32_t>(TokenType::_TokenTypeCount) == 31, "Not all tokens are handled in Token::ToString()");
     switch(type)
     {
         case TokenType::Number:
@@ -127,6 +129,8 @@ std::string Token::ToString()
             return "LessThan (`<=`)";
         case TokenType::ExclamationMark:
             return "LessThan (`!`)";
+        case TokenType::Dot:
+            return "Dot (`.`)";
         case TokenType::Function:
             return "Function (`function`)";
         case TokenType::Return:

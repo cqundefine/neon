@@ -18,7 +18,8 @@ enum class ExpressionType
     Call,
     Cast,
     ArrayAccess,
-    Dereference
+    Dereference,
+    MemberAccess
 };
 
 struct AST
@@ -152,6 +153,29 @@ struct DereferenceExpressionAST : public ExpressionAST
         // This should get cought by the typechecker
         assert(pointer->type->type == TypeEnum::Pointer); 
         return StaticRefCast<PointerType>(pointer->type)->underlayingType;
+    }
+};
+
+struct MemberAccessExpressionAST : public ExpressionAST
+{
+    Ref<ExpressionAST> object;
+    std::string memberName;
+    
+    inline MemberAccessExpressionAST(Location location, Ref<ExpressionAST> object, const std::string& memberName) : ExpressionAST(location, ExpressionType::MemberAccess), object(object), memberName(memberName) {}
+
+    virtual void Dump(uint32_t indentCount) const override;
+    virtual llvm::Value* Codegen() const override;
+    virtual void Typecheck() const override;
+    virtual inline Ref<Type> GetType() const override 
+    {
+        // FIXME: String is not the only struct type
+        assert(object->GetType()->type == TypeEnum::String); 
+        if (memberName == "data")
+            return MakeRef<PointerType>(MakeRef<IntegerType>(8, true));
+        else if (memberName == "size")
+            return MakeRef<IntegerType>(64, true);
+        else
+            assert(false);
     }
 };
 

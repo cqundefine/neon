@@ -29,7 +29,7 @@
 				},
 				{
 					"name": "support.type",
-					"match": "\\b(int8|uint8|int16|uint16|int32|uint32|int64|uint64|void)\\b"
+					"match": "\\b(int8|uint8|int16|uint16|int32|uint32|int64|uint64|void|string)\\b"
 				}
 			]
 		},

@@ -37,31 +37,26 @@ int main(int argc, char** argv)
     else if (operation == "ir")
     {
         parsedFile->Codegen();
-        g_context->Finalize();
         g_context->module->print(llvm::outs(), nullptr);
     }
     else if (operation == "asm")
     {
         parsedFile->Codegen();
-        g_context->Finalize();
         g_context->Write(Context::OutputFileType::Assembly);
     }
     else if (operation == "obj")
     {
         parsedFile->Codegen();
-        g_context->Finalize();
         g_context->Write(Context::OutputFileType::Object);
     }
     else if (operation == "exe")
     {
         parsedFile->Codegen();
-        g_context->Finalize();
         g_context->Write(Context::OutputFileType::Executable);
     }
     else if (operation == "exe-r")
     {
         parsedFile->Codegen();
-        g_context->Finalize();
         g_context->Write(Context::OutputFileType::ExecutableRun);
     }
     else

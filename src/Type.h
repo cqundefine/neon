@@ -49,6 +49,8 @@ struct StringType : public Type
     virtual llvm::Type* GetType() const override;
     virtual std::string Dump() const override;
     virtual bool Equals(const Type& other) const override;
+
+    llvm::Type* GetUnderlayingType() const;
 };
 
 struct ArrayType : public Type

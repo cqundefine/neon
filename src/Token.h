@@ -32,6 +32,7 @@ enum class TokenType
     LessThan,
     LessThanOrEqual,
     ExclamationMark,
+    Dot,
 
     // Keywords
     Function,

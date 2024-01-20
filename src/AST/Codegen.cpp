@@ -21,11 +21,15 @@ llvm::Value* VariableExpressionAST::Codegen() const
 llvm::Value* StringLiteralAST::Codegen() const
 {
     std::vector<llvm::Constant *> chars(value.size());
-    for(unsigned int i = 0; i < value.size(); i++)
+    for(uint8_t i = 0; i < value.size(); i++)
         chars[i] = llvm::ConstantInt::get(*g_context->llvmContext, llvm::APInt(8, value[i], true));
-    auto init = llvm::ConstantArray::get(llvm::ArrayType::get(llvm::Type::getInt8Ty(*g_context->llvmContext), chars.size()), chars);
-    llvm::GlobalVariable * v = new llvm::GlobalVariable(*g_context->module, init->getType(), true, llvm::GlobalVariable::ExternalLinkage, init, value);
-    return llvm::ConstantExpr::getBitCast(v, llvm::Type::getInt8PtrTy(*g_context->llvmContext));
+    
+    auto charArray = llvm::ConstantArray::get(llvm::ArrayType::get(llvm::Type::getInt8Ty(*g_context->llvmContext), chars.size()), chars);
+    auto rawString = new llvm::GlobalVariable(*g_context->module, charArray->getType(), true, llvm::GlobalValue::PrivateLinkage, charArray);
+    auto stringStruct = llvm::ConstantStruct::get(g_context->stringType, { llvm::ConstantExpr::getBitCast(rawString, llvm::Type::getInt8PtrTy(*g_context->llvmContext)), llvm::ConstantInt::get(*g_context->llvmContext, llvm::APInt(64, value.size())) });
+    
+    llvm::GlobalVariable* globalVariable = new llvm::GlobalVariable(*g_context->module, stringStruct->getType(), true, llvm::GlobalVariable::ExternalLinkage, stringStruct);
+    return globalVariable;
 }
 
 llvm::Value* BinaryExpressionAST::Codegen() const
@@ -141,6 +145,33 @@ llvm::Value* ArrayAccessExpressionAST::Codegen() const
 llvm::Value* DereferenceExpressionAST::Codegen() const
 {
     return g_context->builder->CreateLoad(StaticRefCast<PointerType>(pointer->GetType())->underlayingType->GetType(), pointer->Codegen(), pointer->name);
+}
+
+llvm::Value* MemberAccessExpressionAST::Codegen() const
+{
+    assert(object->GetType()->type == TypeEnum::String);
+    auto structType = StaticRefCast<StringType>(object->GetType())->GetUnderlayingType();
+    
+    // FIXME: Unhardcode this when we have proper struct types
+    auto elementIndex = memberName == "size" ? 1 : 0;
+    auto elementType = memberName == "size" ? (llvm::Type*)llvm::Type::getInt64Ty(*g_context->llvmContext) : (llvm::Type*)llvm::Type::getInt8PtrTy(*g_context->llvmContext);
+    
+    if (object->type == ExpressionType::StringLiteral)
+    {
+        auto gep = g_context->builder->CreateStructGEP(structType, StaticRefCast<StringLiteralAST>(object)->Codegen(), elementIndex, "gep");
+        return g_context->builder->CreateLoad(elementType, gep, memberName);
+    }
+    else if (object->type == ExpressionType::Variable)
+    {
+        auto alloca = allocas[StaticRefCast<VariableExpressionAST>(object)->name];
+        auto load = g_context->builder->CreateLoad(alloca->getAllocatedType(), alloca, "load");
+        auto gep = g_context->builder->CreateStructGEP(structType, load, elementIndex, "gep");
+        return g_context->builder->CreateLoad(elementType, gep, memberName);
+    }
+    else
+    {
+        assert(false);
+    }
 }
 
 void ReturnStatementAST::Codegen() const

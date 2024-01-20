@@ -17,6 +17,7 @@ private:
     ExpressionOrStatement ParseStatement();
     Ref<ExpressionAST> ParseExpression();
     Ref<ExpressionAST> ParsePrimary();
+    Ref<ExpressionAST> ParseBarePrimary();
     std::pair<BinaryOperation, Location> ParseOperation();
     Ref<Type> ParseType(bool allowVoid = false);
 

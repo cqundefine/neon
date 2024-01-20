@@ -259,15 +259,31 @@ Ref<ExpressionAST> Parser::ParseExpression()
 
 Ref<ExpressionAST> Parser::ParsePrimary()
 {
+    auto primary = ParseBarePrimary();
     Token token = m_lexer.NextToken();
-    if (token.type == TokenType::Number)
+    while(token.type == TokenType::Dot)
     {
-        return MakeRef<NumberExpressionAST>(token.location, token.intValue, MakeRef<IntegerType>(32, true));
+        auto member = m_lexer.NextToken();
+        assert(member.type == TokenType::Identifier);
+        primary = MakeRef<MemberAccessExpressionAST>(token.location, primary, member.stringValue);
+        token = m_lexer.NextToken();
     }
-    else if(token.type == TokenType::Identifier)
+
+    m_lexer.RollbackToken(token);
+    return primary;
+}
+
+Ref<ExpressionAST> Parser::ParseBarePrimary()
+{
+    Token first = m_lexer.NextToken();
+    if (first.type == TokenType::Number)
     {
-        Token paren = m_lexer.NextToken();
-        if (paren.type == TokenType::LParen)
+        return MakeRef<NumberExpressionAST>(first.location, first.intValue, MakeRef<IntegerType>(32, true));
+    }
+    else if(first.type == TokenType::Identifier)
+    {
+        Token second = m_lexer.NextToken();
+        if (second.type == TokenType::LParen)
         {
             std::vector<Ref<ExpressionAST>> args;
             Token arg = m_lexer.NextToken();
@@ -280,45 +296,45 @@ Ref<ExpressionAST> Parser::ParsePrimary()
                 }
                 arg = m_lexer.NextToken();
             }
-            return MakeRef<CallExpressionAST>(token.location, token.stringValue, args);
+            return MakeRef<CallExpressionAST>(first.location, first.stringValue, args);
         }
-        else if (paren.type == TokenType::LessThan)
+        else if (second.type == TokenType::LessThan)
         {
             auto type = ParseType();
             ExpectToken(TokenType::GreaterThan);
             ExpectToken(TokenType::LParen);
             auto child = ParseExpression();
             ExpectToken(TokenType::RParen);
-            return MakeRef<CastExpressionAST>(token.location, type, child);
+            return MakeRef<CastExpressionAST>(first.location, type, child);
         }
         else
         {
-            auto var = MakeRef<VariableExpressionAST>(token.location, token.stringValue);
-            if (paren.type == TokenType::LSquareBracket)
+            auto var = MakeRef<VariableExpressionAST>(first.location, first.stringValue);
+            if (second.type == TokenType::LSquareBracket)
             {
                 auto index = ParsePrimary();
                 assert(index->type == ExpressionType::Number);
                 ExpectToken(TokenType::RSquareBracket);
-                return MakeRef<ArrayAccessExpressionAST>(paren.location, var, std::static_pointer_cast<NumberExpressionAST>(index));
+                return MakeRef<ArrayAccessExpressionAST>(second.location, var, std::static_pointer_cast<NumberExpressionAST>(index));
             }
-            m_lexer.RollbackToken(paren);
+            m_lexer.RollbackToken(second);
             return var;
         }
     }
-    else if (token.type == TokenType::StringLiteral)
+    else if (first.type == TokenType::StringLiteral)
     {
-        return MakeRef<StringLiteralAST>(token.location, token.stringValue);
+        return MakeRef<StringLiteralAST>(first.location, first.stringValue);
     }
-    else if (token.type == TokenType::Asterisk)
+    else if (first.type == TokenType::Asterisk)
     {
         auto child = ParsePrimary();
         if (child->type != ExpressionType::Variable)
-            g_context->Error(token.location, "Can't dereference this expression");
-        return MakeRef<DereferenceExpressionAST>(token.location, StaticRefCast<VariableExpressionAST>(child));
+            g_context->Error(first.location, "Can't dereference this expression");
+        return MakeRef<DereferenceExpressionAST>(first.location, StaticRefCast<VariableExpressionAST>(child));
     }
     else
     {
-        g_context->Error(token.location, "Unexpected token: %s", token.ToString().c_str());
+        g_context->Error(first.location, "Unexpected token: %s", first.ToString().c_str());
     }
 }
 
@@ -370,6 +386,8 @@ Ref<Type> Parser::ParseType(bool allowVoid)
         type = MakeRef<IntegerType>(32, typeToken.stringValue[0] != 'u');
     else if (typeToken.stringValue == "int64" || typeToken.stringValue == "uint64")
         type = MakeRef<IntegerType>(64, typeToken.stringValue[0] != 'u');
+    else if (typeToken.stringValue == "string")
+        type = MakeRef<StringType>();
     else if (typeToken.stringValue == "void")
     {
         if (!allowVoid)

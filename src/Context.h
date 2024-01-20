@@ -19,11 +19,10 @@ struct Context
     Own<llvm::Module> module;
     Own<llvm::legacy::FunctionPassManager> functionPassManager;
     llvm::TargetMachine* targetMachine;
+    llvm::StructType* stringType;
 
     std::pair<uint32_t, uint32_t> LineColumnFromLocation(Location location) const;
     [[noreturn]] void Error(uint32_t location, const char* fmt, ...) const;
-
-    void Finalize();
 
     enum class OutputFileType
     {

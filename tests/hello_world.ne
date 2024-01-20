@@ -1,5 +1,6 @@
 function main(): int32
 {
-    syscall3(1, 1, to<int64>("Hello, world!\n"), 14);
+    text: string = "Hello, world!\n";
+    syscall3(1, 1, text.data, text.size);
     return 0;
 }

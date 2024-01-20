@@ -4,6 +4,8 @@ build
 *.asm
 !helper.asm
 *.ir
+*.ll
+*.s
 output*
 
 tests/*

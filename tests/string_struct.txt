@@ -1,0 +1,9 @@
+:i builds 1
+:i argc 0
+:b stdin 0
+
+:i returncode 6
+:b stdout 0
+
+:b stderr 0
+

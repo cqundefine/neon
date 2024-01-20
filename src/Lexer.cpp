@@ -2,7 +2,7 @@
 
 Token Lexer::NextToken() const
 {
-    static_assert(static_cast<uint32_t>(TokenType::_TokenTypeCount) == 30, "Not all tokens are handled in Lexer::NextToken()");
+    static_assert(static_cast<uint32_t>(TokenType::_TokenTypeCount) == 31, "Not all tokens are handled in Lexer::NextToken()");
 
     uint32_t beginIndex = m_index;
 
@@ -137,6 +137,11 @@ Token Lexer::NextToken() const
         }
         return { .type = TokenType::ExclamationMark, .length = m_index - beginIndex, .location = m_index - 1 };
     }
+    else if (g_context->fileContent[m_index] == '.')
+    {
+        m_index++;
+        return { .type = TokenType::Dot, .length = m_index - beginIndex, .location = m_index - 1 };
+    }
     else if (g_context->fileContent[m_index] == '"')
     {
         uint32_t trueBeginIndex = m_index;
@@ -243,8 +248,6 @@ Token Lexer::NextToken() const
                 .location = trueBeginIndex
             };
     }
-
-    printf("%X\n", g_context->fileContent[1]);
 
     g_context->Error(m_index, "Unexpected symbol: %c", g_context->fileContent[m_index]);
 }

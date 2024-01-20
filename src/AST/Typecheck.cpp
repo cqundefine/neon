@@ -96,6 +96,14 @@ void DereferenceExpressionAST::Typecheck() const
         g_context->Error(location, "Can't dereference non-pointer type: %s", pointer->type->Dump().c_str());
 }
 
+void MemberAccessExpressionAST::Typecheck() const
+{
+    object->Typecheck();
+    // FIXME: Check if struct has that field once we actually support structs
+    if (memberName != "data" && memberName != "size")
+        g_context->Error(location, "Can't access member %s", memberName.c_str());
+}
+
 void ReturnStatementAST::Typecheck() const
 {
     returnedType = FindVariable(typecheckCurrentFunction);

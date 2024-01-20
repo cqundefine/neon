@@ -41,7 +41,7 @@ llvm::Type* IntegerType::GetType() const
 
 llvm::Type* StringType::GetType() const
 {
-    return llvm::Type::getInt8PtrTy(*g_context->llvmContext);
+    return llvm::PointerType::get(g_context->stringType, 0);
 }
 
 llvm::Type* ArrayType::GetType() const
@@ -90,4 +90,13 @@ bool VoidType::Equals(const Type& other) const
 {
     // FIXME: Figure out if we should ever compare void types
     return true;
+}
+
+// --------------------------
+// Other
+// --------------------------
+
+llvm::Type* StringType::GetUnderlayingType() const
+{
+    return g_context->stringType;
 }

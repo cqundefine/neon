@@ -53,6 +53,9 @@ Context::Context()
     module->setDataLayout(targetMachine->createDataLayout());
     module->setTargetTriple(targetTriple);
 
+    std::vector<llvm::Type*> stringMembers { llvm::Type::getInt8PtrTy(*llvmContext), llvm::Type::getInt64Ty(*llvmContext) };
+    stringType = llvm::StructType::create(*llvmContext, stringMembers, "String");
+
     CreateSyscall0();
     CreateSyscall1();
     CreateSyscall2();
@@ -94,20 +97,6 @@ std::pair<uint32_t, uint32_t> Context::LineColumnFromLocation(uint32_t location)
     va_end(va);
 
     exit(1);
-}
-
-void Context::Finalize()
-{
-    // auto functionType = llvm::FunctionType::get(llvm::Type::getVoidTy(*llvmContext), false);
-    // auto function = llvm::Function::Create(functionType, llvm::Function::LinkageTypes::ExternalLinkage, "_start", *module);
-
-    // auto block = llvm::BasicBlock::Create(*llvmContext, "entry", function);
-    // builder->SetInsertPoint(block);
-
-    // auto mainCall = builder->CreateCall(g_context->module->getFunction("main"), llvm::None, "maincall");
-    // auto intcast = builder->CreateIntCast(mainCall, llvm::Type::getInt64Ty(*llvmContext), false, "intcast");
-    // auto syscall1 = builder->CreateCall(g_context->module->getFunction("syscall1"), { llvm::ConstantInt::get(*llvmContext, llvm::APInt(64, 60, false)), mainCall }, "exitSyscall");   
-    // builder->CreateRetVoid();
 }
 
 void Context::Write(OutputFileType fileType)
