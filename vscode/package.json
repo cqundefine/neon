@@ -3,6 +3,14 @@
   "displayName": "Neon Language",
   "description": "Syntax highlighting for the Neon programming language",
   "version": "0.0.1",
+  "author": {
+    "name": "Undefine",
+    "email": "undefine@undefine.pl"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cqundefine/neon"
+  },
   "engines": {
     "vscode": "^1.81.0"
   },

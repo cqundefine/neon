@@ -11,3 +11,5 @@ output*
 tests/*
 !tests/*.ne
 !tests/*.txt
+
+vscode/*.vsix
