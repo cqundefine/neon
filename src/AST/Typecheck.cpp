@@ -186,6 +186,9 @@ void ParsedFile::Typecheck() const
     typecheckFunctions["syscall1"] = {{ int64, int64 }};
     typecheckFunctions["syscall2"] = {{ int64, int64, int64 }};
     typecheckFunctions["syscall3"] = {{ int64, int64, int64, int64 }};
+    typecheckFunctions["syscall4"] = {{ int64, int64, int64, int64, int64 }};
+    typecheckFunctions["syscall5"] = {{ int64, int64, int64, int64, int64, int64 }};
+    typecheckFunctions["syscall6"] = {{ int64, int64, int64, int64, int64, int64, int64 }};
 
     for (const auto& function : functions)
         function->Typecheck();

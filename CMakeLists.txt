@@ -18,6 +18,8 @@ add_compile_options(-fdiagnostics-color=always)
 file(GLOB_RECURSE SOURCES src/*.cpp src/AST/*.cpp)
 add_executable(Neon ${SOURCES})
 
+target_include_directories(Neon PRIVATE external)
+
 include_directories(${LLVM_INCLUDE_DIRS})
 add_definitions(${LLVM_DEFINITIONS})
 

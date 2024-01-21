@@ -2,21 +2,59 @@
 #include <Lexer.h>
 #include <Parser.h>
 
-#include <llvm/CodeGen/MachineInstr.h>
+#include <argparse/argparse.hpp>
 
 int main(int argc, char** argv)
 {
-    assert(argc == 3);
+    argparse::ArgumentParser program("neon");
+
+    program.add_argument("filename")
+        .help("input file");
+
+    program.add_argument("-c")
+        .help("compile to object file")
+        .flag();
+
+    program.add_argument("-r", "--run")
+        .help("run executable")
+        .flag();
+
+    auto& dumpGroup = program.add_mutually_exclusive_group();
+
+    dumpGroup.add_argument("--dump-tokens")
+        .help("dump tokens")
+        .flag();
+
+    dumpGroup.add_argument("--dump-ast")
+        .help("dump AST")
+        .flag();
+
+    dumpGroup.add_argument("--dump-ir")
+        .help("dump IR")
+        .flag();
+
+    dumpGroup.add_argument("--dump-asm")
+        .help("dump assembly")
+        .flag();
+
+    try
+    {
+        program.parse_args(argc, argv);
+    }
+    catch (const std::runtime_error& err)
+    {
+        std::cout << err.what() << std::endl;
+        std::cout << program;
+        exit(1);
+    }
 
     g_context = MakeRef<Context>();
-    g_context->filename = argv[1];
+    g_context->filename = program.get("filename");
     g_context->fileContent = ReadFile(g_context->filename);
-
-    std::string operation = argv[2];
 
     Lexer lexer;
     
-    if (operation == "token")
+    if (program["--dump-tokens"] == true)
     {
         Token token;
         do {
@@ -30,37 +68,21 @@ int main(int argc, char** argv)
     auto parsedFile = parser.Parse();
     parsedFile->Typecheck();
     
-    if (operation == "ast")
+    if (program["--dump-ast"] == true)
     {
         parsedFile->Dump();
+        return 0;
     }
-    else if (operation == "ir")
-    {
-        parsedFile->Codegen();
+
+    parsedFile->Codegen();
+    if (program["--dump-ir"] == true)
         g_context->module->print(llvm::outs(), nullptr);
-    }
-    else if (operation == "asm")
-    {
-        parsedFile->Codegen();
+    else if (program["--dump-asm"] == true)
         g_context->Write(Context::OutputFileType::Assembly);
-    }
-    else if (operation == "obj")
-    {
-        parsedFile->Codegen();
+    else if (program["-c"] == true)
         g_context->Write(Context::OutputFileType::Object);
-    }
-    else if (operation == "exe")
-    {
-        parsedFile->Codegen();
-        g_context->Write(Context::OutputFileType::Executable);
-    }
-    else if (operation == "exe-r")
-    {
-        parsedFile->Codegen();
-        g_context->Write(Context::OutputFileType::ExecutableRun);
-    }
     else
-    {
-        assert(false);
-    }
+        g_context->Write(Context::OutputFileType::Executable, program["--run"] == true);
+
+    return 0;
 }

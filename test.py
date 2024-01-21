@@ -119,7 +119,7 @@ def run_test_for_file(file_path: str, stats: RunStats = RunStats()):
     error = False
 
     if tc is not None:
-        comp = cmd_run_echoed(["build/Neon", file_path, "exe", *tc.argv], input=tc.stdin)
+        comp = cmd_run_echoed(["build/Neon", file_path, *tc.argv], input=tc.stdin)
         if (comp.returncode != 0 and tc.builds) or (comp.returncode == 0 and not tc.builds):
             error = True
             stats.failed += 1
@@ -145,7 +145,7 @@ def run_test_for_file(file_path: str, stats: RunStats = RunStats()):
 
     else:
         print('[WARNING] Could not find any input/output data for %s. Ignoring testing. Only checking if it compiles.' % file_path)
-        com = cmd_run_echoed(["build/Neon", file_path, "exe"])
+        com = cmd_run_echoed(["build/Neon", file_path])
         if com.returncode != 0:
             error = True
             stats.failed += 1
@@ -187,7 +187,7 @@ def update_output_for_file(file_path: str):
     tc_path = file_path[:-len(NEON_EXT)] + ".txt"
     tc = load_test_case(tc_path) or DEFAULT_TEST_CASE
 
-    outputcomp = cmd_run_echoed(["build/Neon", file_path, "exe", *tc.argv], input=tc.stdin)
+    outputcomp = cmd_run_echoed(["build/Neon", file_path, *tc.argv], input=tc.stdin)
     if outputcomp.returncode == 0:
         output = cmd_run_echoed([file_path[:-len(NEON_EXT)]], input=tc.stdin, capture_output=True)
         print("[INFO] Saving output to %s" % tc_path)

@@ -278,7 +278,7 @@ llvm::Function* FunctionAST::Codegen() const
 
         llvm::verifyFunction(*function);
 
-        // g_context->functionPassManager->run(*function);
+        g_context->functionPassManager->run(*function);
     }
 
     return function;

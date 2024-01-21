@@ -28,17 +28,10 @@ struct Context
     {
         Assembly,
         Object,
-        Executable,
-        ExecutableRun
+        Executable
     };
 
-    void Write(OutputFileType fileType);
-
-private:
-    void CreateSyscall0();
-    void CreateSyscall1();
-    void CreateSyscall2();
-    void CreateSyscall3();
+    void Write(OutputFileType fileType, bool run = false) const;
 };
 
 extern Ref<Context> g_context;
