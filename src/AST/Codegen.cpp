@@ -6,7 +6,20 @@
 #include <llvm/IR/LegacyPassManager.h>
 #include <llvm/IR/Verifier.h>
 
-static std::map<std::string, llvm::AllocaInst*> allocas;
+static std::vector<std::map<std::string, llvm::AllocaInst*>> blockStack;
+[[nodiscard]] static llvm::AllocaInst* FindVariable(const std::string& name, Location location)
+{
+    for (int i = blockStack.size() - 1; i >= 0; i--)
+    {
+        const auto& block = blockStack.at(i);
+        if (block.contains(name))
+            return block.at(name);
+    }
+
+    // FIXME: Shouldn't this be unreachable?
+    g_context->Error(location, "Can't find variable: %s", name.c_str());
+}
+
 
 llvm::Value* NumberExpressionAST::Codegen() const
 {
@@ -15,7 +28,8 @@ llvm::Value* NumberExpressionAST::Codegen() const
 
 llvm::Value* VariableExpressionAST::Codegen() const
 {
-    return g_context->builder->CreateLoad(allocas[name]->getAllocatedType(), allocas[name], name);
+    auto alloca = FindVariable(name, location);
+    return g_context->builder->CreateLoad(alloca->getAllocatedType(), alloca, name);
 }
 
 llvm::Value* StringLiteralAST::Codegen() const
@@ -41,12 +55,12 @@ llvm::Value* BinaryExpressionAST::Codegen() const
         if(lhs->type == ExpressionType::Variable)
         {
             auto variableLHS = StaticRefCast<VariableExpressionAST>(lhs);
-            g_context->builder->CreateStore(rhs->Codegen(), allocas[variableLHS->name]);
+            g_context->builder->CreateStore(rhs->Codegen(), FindVariable(variableLHS->name, location));
         }
         else if(lhs->type == ExpressionType::ArrayAccess)
         {
             auto arrayLHS = StaticRefCast<ArrayAccessExpressionAST>(lhs);
-            auto gep = g_context->builder->CreateGEP(allocas[arrayLHS->array->name]->getAllocatedType(), allocas[arrayLHS->array->name], arrayLHS->index->Codegen(), "gep");
+            auto gep = g_context->builder->CreateGEP(FindVariable(arrayLHS->array->name, location)->getAllocatedType(), FindVariable(arrayLHS->array->name, location), arrayLHS->index->Codegen(), "gep");
             g_context->builder->CreateStore(rhs->Codegen(), gep);
         }
         else if(lhs->type == ExpressionType::Dereference)
@@ -138,7 +152,8 @@ llvm::Value* CastExpressionAST::Codegen() const
 
 llvm::Value* ArrayAccessExpressionAST::Codegen() const
 {
-    auto gep = g_context->builder->CreateGEP(allocas[array->name]->getAllocatedType(), allocas[array->name], index->Codegen(), "gep");
+    auto alloca = FindVariable(array->name, location);
+    auto gep = g_context->builder->CreateGEP(alloca->getAllocatedType(), alloca, index->Codegen(), "gep");
     return g_context->builder->CreateLoad(StaticRefCast<ArrayType>(array->GetType())->arrayType->GetType(), gep, array->name);
 }
 
@@ -163,7 +178,7 @@ llvm::Value* MemberAccessExpressionAST::Codegen() const
     }
     else if (object->type == ExpressionType::Variable)
     {
-        auto alloca = allocas[StaticRefCast<VariableExpressionAST>(object)->name];
+        auto alloca = FindVariable(StaticRefCast<VariableExpressionAST>(object)->name, location);
         auto load = g_context->builder->CreateLoad(alloca->getAllocatedType(), alloca, "load");
         auto gep = g_context->builder->CreateStructGEP(structType, load, elementIndex, "gep");
         return g_context->builder->CreateLoad(elementType, gep, memberName);
@@ -184,6 +199,8 @@ void ReturnStatementAST::Codegen() const
 
 void BlockAST::Codegen() const
 {
+    blockStack.push_back({});
+
     for(const auto& statement : statements)
     {
         if (std::holds_alternative<Ref<StatementAST>>(statement))
@@ -191,6 +208,8 @@ void BlockAST::Codegen() const
         else
             std::get<Ref<ExpressionAST>>(statement)->Codegen();
     }
+
+    blockStack.pop_back();
 }
 
 void IfStatementAST::Codegen() const
@@ -255,9 +274,11 @@ void VariableDefinitionAST::Codegen() const
     auto parentFunction = g_context->builder->GetInsertBlock()->getParent();
     llvm::IRBuilder<> functionBeginBuilder(&parentFunction->getEntryBlock(), parentFunction->getEntryBlock().begin());
     auto size = type->type == TypeEnum::Array ? llvm::ConstantInt::get(*g_context->llvmContext, llvm::APInt(64, StaticRefCast<ArrayType>(type)->size)) : nullptr;
-    allocas[name] = functionBeginBuilder.CreateAlloca(type->GetType(), size, name);
+    
+    blockStack.back()[name] = functionBeginBuilder.CreateAlloca(type->GetType(), size, name);
+    
     if (initialValue != nullptr)
-        g_context->builder->CreateStore(initialValue->Codegen(), allocas[name]);
+        g_context->builder->CreateStore(initialValue->Codegen(), FindVariable(name, location));
 }
 
 llvm::Function* FunctionAST::Codegen() const
@@ -268,24 +289,52 @@ llvm::Function* FunctionAST::Codegen() const
 
     auto functionType = llvm::FunctionType::get(returnType->GetType(), llvmParams, false);
     auto function = llvm::Function::Create(functionType, llvm::Function::ExternalLinkage, name, g_context->module.get());
-    
+
+    for (auto& param : function->args())
+        param.setName(params[param.getArgNo()].name);
+
     if (block != nullptr)
     {
+        blockStack.push_back({});
+
         auto basicBlock = llvm::BasicBlock::Create(*g_context->llvmContext, "entry", function);
         g_context->builder->SetInsertPoint(basicBlock);
 
+        for (auto& arg : function->args())
+        {
+            // FIXME: Array support
+            auto alloca = g_context->builder->CreateAlloca(arg.getType(), 0, arg.getName());
+            blockStack.back()[arg.getName().str()] = alloca;
+            g_context->builder->CreateStore(&arg, alloca);
+        }
+
         block->Codegen();
+
+        if (returnType->type == TypeEnum::Void)
+            g_context->builder->CreateRetVoid();
 
         llvm::verifyFunction(*function);
 
-        g_context->functionPassManager->run(*function);
+        if (g_context->optimize)
+            g_context->functionPassManager->run(*function);
+        
+        blockStack.pop_back();
     }
+
 
     return function;
 }
 
 void ParsedFile::Codegen() const
 {
+    blockStack.push_back({});
+
     for (const auto& function : functions)
         function->Codegen();
+
+    llvm::verifyModule(*g_context->module);
+
+    blockStack.pop_back();
+
+    assert(blockStack.size() == 0);
 }

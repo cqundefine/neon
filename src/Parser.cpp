@@ -7,18 +7,18 @@ Ref<ParsedFile> Parser::Parse()
     std::vector<Ref<FunctionAST>> functions;
     while (true)
     {
-        auto token = m_lexer.NextToken();
+        auto token = m_stream.NextToken();
         if (token.type == TokenType::Extern || token.type == TokenType::Function)
         {
             if (token.type == TokenType::Extern)
                 ExpectToken(TokenType::Function);
-            auto nameToken = m_lexer.NextToken();
+            auto nameToken = m_stream.NextToken();
             assert(nameToken.type == TokenType::Identifier);
             ExpectToken(TokenType::LParen);
 
             std::vector<FunctionAST::Param> params;
 
-            Token maybeName = m_lexer.NextToken();
+            Token maybeName = m_stream.NextToken();
             while (maybeName.type == TokenType::Identifier)
             {
                 ExpectToken(TokenType::Colon);
@@ -26,14 +26,14 @@ Ref<ParsedFile> Parser::Parse()
 
                 params.push_back({maybeName.stringValue, type});
 
-                Token maybeComma = m_lexer.NextToken();
+                Token maybeComma = m_stream.NextToken();
                 if (maybeComma.type != TokenType::Comma)
-                    m_lexer.RollbackToken(maybeComma);
+                    m_stream.PreviousToken();
 
-                maybeName = m_lexer.NextToken();
+                maybeName = m_stream.NextToken();
             }
 
-            m_lexer.RollbackToken(maybeName);
+            m_stream.PreviousToken();
 
             ExpectToken(TokenType::RParen);
             ExpectToken(TokenType::Colon);
@@ -61,17 +61,17 @@ Ref<ParsedFile> Parser::Parse()
 
 Ref<BlockAST> Parser::ParseBlock()
 {
-    auto lcurly = m_lexer.NextToken();
+    auto lcurly = m_stream.NextToken();
     assert(lcurly.type == TokenType::LCurly);
-    Token token = m_lexer.NextToken();
+    Token token = m_stream.NextToken();
     
     std::vector<ExpressionOrStatement> statements;
 
     while(token.type != TokenType::RCurly)
     {
-        m_lexer.RollbackToken(token);
+        m_stream.PreviousToken();
         statements.push_back(ParseStatement());
-        token = m_lexer.NextToken();
+        token = m_stream.NextToken();
     }
 
     return MakeRef<BlockAST>(lcurly.location, statements);
@@ -79,7 +79,7 @@ Ref<BlockAST> Parser::ParseBlock()
 
 ExpressionOrStatement Parser::ParseStatement()
 {
-    auto token = m_lexer.NextToken();
+    auto token = m_stream.NextToken();
     if (token.type == TokenType::Return)
     {
         auto value = ParseExpression();
@@ -90,7 +90,7 @@ ExpressionOrStatement Parser::ParseStatement()
     {
         auto condition = ParseExpression();
         auto block = ParseBlock();
-        auto else_ = m_lexer.NextToken();
+        auto else_ = m_stream.NextToken();
         if (else_.type == TokenType::Identifier && else_.stringValue == "else")
         {
             auto elseBlock = ParseBlock();
@@ -98,7 +98,7 @@ ExpressionOrStatement Parser::ParseStatement()
         }
         else
         {
-            m_lexer.RollbackToken(else_);
+            m_stream.PreviousToken();
         }
         return MakeRef<IfStatementAST>(token.location, condition, block, nullptr);
     }
@@ -110,11 +110,11 @@ ExpressionOrStatement Parser::ParseStatement()
     }
     else if (token.type == TokenType::Identifier)
     {
-        Token colon = m_lexer.NextToken();
+        Token colon = m_stream.NextToken();
         if (colon.type == TokenType::Colon)
         {
             auto type = ParseType();
-            auto equalsOrSemicolon = m_lexer.NextToken();
+            auto equalsOrSemicolon = m_stream.NextToken();
             if (equalsOrSemicolon.type == TokenType::Semicolon)
             {
                 return MakeRef<VariableDefinitionAST>(token.location, token.stringValue, type, nullptr);
@@ -128,8 +128,8 @@ ExpressionOrStatement Parser::ParseStatement()
         }
         else
         {
-            m_lexer.RollbackToken(colon);
-            m_lexer.RollbackToken(token);
+            m_stream.PreviousToken();
+            m_stream.PreviousToken();
             auto expression = ParseExpression();
             ExpectToken(TokenType::Semicolon);
             return expression;
@@ -137,7 +137,7 @@ ExpressionOrStatement Parser::ParseStatement()
     }
     else
     {
-        m_lexer.RollbackToken(token);
+        m_stream.PreviousToken();
         auto expression = ParseExpression();
         ExpectToken(TokenType::Semicolon);
         return expression;
@@ -160,13 +160,13 @@ Ref<ExpressionAST> Parser::ParseExpression()
     int parenCount = 0;
 
     {
-        Token token = m_lexer.NextToken();
+        Token token = m_stream.NextToken();
         while(token.type == TokenType::LParen)
         {
             parenCount++;
-            token = m_lexer.NextToken();
+            token = m_stream.NextToken();
         }
-        m_lexer.RollbackToken(token);
+        m_stream.PreviousToken();
     }
 
     auto leftSide = ParsePrimary();
@@ -181,26 +181,26 @@ Ref<ExpressionAST> Parser::ParseExpression()
         int precedence = BinaryOperationPrecedence[operation.first] + parenCount * 1000;
 
         {
-            Token token = m_lexer.NextToken();
+            Token token = m_stream.NextToken();
             while(token.type == TokenType::LParen)
             {
                 parenCount++;
-                token = m_lexer.NextToken();
+                token = m_stream.NextToken();
             }
-            m_lexer.RollbackToken(token);
+            m_stream.PreviousToken();
         }
 
         auto right_side = ParsePrimary();
 
         if (parenCount > 0)
         {
-            Token token = m_lexer.NextToken();
+            Token token = m_stream.NextToken();
             while(token.type == TokenType::RParen)
             {
                 parenCount--;
-                token = m_lexer.NextToken();
+                token = m_stream.NextToken();
             }
-            m_lexer.RollbackToken(token);
+            m_stream.PreviousToken();
         }
 
         while (precedence <= lastPrecedence && expressionStack.size() > 1)
@@ -233,13 +233,13 @@ Ref<ExpressionAST> Parser::ParseExpression()
 
     if (parenCount > 0)
     {
-        Token token = m_lexer.NextToken();
+        Token token = m_stream.NextToken();
         while(token.type == TokenType::RParen)
         {
             parenCount--;
-            token = m_lexer.NextToken();
+            token = m_stream.NextToken();
         }
-        m_lexer.RollbackToken(token);
+        m_stream.PreviousToken();
     }
 
     while (expressionStack.size() != 1)
@@ -260,41 +260,41 @@ Ref<ExpressionAST> Parser::ParseExpression()
 Ref<ExpressionAST> Parser::ParsePrimary()
 {
     auto primary = ParseBarePrimary();
-    Token token = m_lexer.NextToken();
+    Token token = m_stream.NextToken();
     while(token.type == TokenType::Dot)
     {
-        auto member = m_lexer.NextToken();
+        auto member = m_stream.NextToken();
         assert(member.type == TokenType::Identifier);
         primary = MakeRef<MemberAccessExpressionAST>(token.location, primary, member.stringValue);
-        token = m_lexer.NextToken();
+        token = m_stream.NextToken();
     }
 
-    m_lexer.RollbackToken(token);
+    m_stream.PreviousToken();
     return primary;
 }
 
 Ref<ExpressionAST> Parser::ParseBarePrimary()
 {
-    Token first = m_lexer.NextToken();
+    Token first = m_stream.NextToken();
     if (first.type == TokenType::Number)
     {
         return MakeRef<NumberExpressionAST>(first.location, first.intValue, MakeRef<IntegerType>(32, true));
     }
     else if(first.type == TokenType::Identifier)
     {
-        Token second = m_lexer.NextToken();
+        Token second = m_stream.NextToken();
         if (second.type == TokenType::LParen)
         {
             std::vector<Ref<ExpressionAST>> args;
-            Token arg = m_lexer.NextToken();
+            Token arg = m_stream.NextToken();
             while(arg.type != TokenType::RParen)
             {
                 if (arg.type != TokenType::Comma)
                 {
-                    m_lexer.RollbackToken(arg);
+                    m_stream.PreviousToken();
                     args.push_back(ParseExpression());
                 }
-                arg = m_lexer.NextToken();
+                arg = m_stream.NextToken();
             }
             return MakeRef<CallExpressionAST>(first.location, first.stringValue, args);
         }
@@ -317,7 +317,7 @@ Ref<ExpressionAST> Parser::ParseBarePrimary()
                 ExpectToken(TokenType::RSquareBracket);
                 return MakeRef<ArrayAccessExpressionAST>(second.location, var, std::static_pointer_cast<NumberExpressionAST>(index));
             }
-            m_lexer.RollbackToken(second);
+            m_stream.PreviousToken();
             return var;
         }
     }
@@ -342,7 +342,7 @@ std::pair<BinaryOperation, Location> Parser::ParseOperation()
 {
     static_assert(static_cast<uint32_t>(BinaryOperation::_BinaryOperationCount) == 11, "Not all binary operations are handled in Parser::ParseOperation()");
     
-    Token token = m_lexer.NextToken();
+    Token token = m_stream.NextToken();
     switch (token.type)
     {
         case TokenType::Plus:
@@ -368,14 +368,14 @@ std::pair<BinaryOperation, Location> Parser::ParseOperation()
         case TokenType::Equals:
             return { BinaryOperation::Assignment, token.location };
         default:
-            m_lexer.RollbackToken(token);
+            m_stream.PreviousToken();
             return { BinaryOperation::_BinaryOperationCount, token.location };
     }
 }
 
 Ref<Type> Parser::ParseType(bool allowVoid)
 {
-    Token typeToken = m_lexer.NextToken();
+    Token typeToken = m_stream.NextToken();
     assert(typeToken.type == TokenType::Identifier);
     Ref<Type> type;
     if (typeToken.stringValue == "int8" || typeToken.stringValue == "uint8")
@@ -397,26 +397,26 @@ Ref<Type> Parser::ParseType(bool allowVoid)
     else
         g_context->Error(typeToken.location, "Unexpected token: %s", typeToken.ToString().c_str());
 
-    Token modifier = m_lexer.NextToken();
+    Token modifier = m_stream.NextToken();
     if (modifier.type == TokenType::Asterisk)
     {
         while (modifier.type == TokenType::Asterisk)
         {
             type = MakeRef<PointerType>(type);
-            modifier = m_lexer.NextToken();
+            modifier = m_stream.NextToken();
         }
-        m_lexer.RollbackToken(modifier);
+        m_stream.PreviousToken();
     }
     else if (modifier.type == TokenType::LSquareBracket)
     {
-        auto size = m_lexer.NextToken();
+        auto size = m_stream.NextToken();
         assert(size.type == TokenType::Number);
         ExpectToken(TokenType::RSquareBracket);
         return MakeRef<ArrayType>(type, size.intValue);
     }
     else
     {
-        m_lexer.RollbackToken(modifier);
+        m_stream.PreviousToken();
     }
 
     return type;
@@ -424,7 +424,7 @@ Ref<Type> Parser::ParseType(bool allowVoid)
 
 void Parser::ExpectToken(TokenType tokenType)
 {
-    Token token = m_lexer.NextToken();
+    Token token = m_stream.NextToken();
     if (token.type != tokenType)
     {
         g_context->Error(token.location, "Unexpected token %s, expected %s", token.ToString().c_str(), TokenTypeToString(tokenType).c_str());

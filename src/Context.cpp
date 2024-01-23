@@ -15,6 +15,8 @@
 
 Ref<Context> g_context;
 
+uint32_t lastFileID = 0;
+
 #define CREATE_SYSCALL(N, REGS) \
     { \
     auto int64Type = llvm::Type::getInt64Ty(*llvmContext); \
@@ -34,10 +36,12 @@ Ref<Context> g_context;
     }
 
 
-Context::Context()
+Context::Context(const std::string& baseFile)
 {
+    rootFileID = LoadFile(baseFile);
+
     llvmContext = MakeOwn<llvm::LLVMContext>();
-    module = MakeOwn<llvm::Module>(filename, *llvmContext);
+    module = MakeOwn<llvm::Module>(baseFile, *llvmContext);
     builder = MakeOwn<llvm::IRBuilder<>>(*llvmContext);
     functionPassManager = MakeOwn<llvm::legacy::FunctionPassManager>(module.get());
 
@@ -84,14 +88,27 @@ Context::Context()
     CREATE_SYSCALL(6, "{ax},{di},{si},{dx},{r10},{r8},{r9}");
 }
 
-std::pair<uint32_t, uint32_t> Context::LineColumnFromLocation(uint32_t location) const
+uint32_t Context::LoadFile(const std::string& filename)
+{
+    for (const auto& [fileID, fileInfo] : files)
+    {
+        if (fileInfo.filename == filename)
+            return fileID;
+    }
+
+    uint32_t fileID = lastFileID++;
+    files[fileID] = { filename, ReadFile(filename) };
+    return fileID;
+}
+
+std::pair<uint32_t, uint32_t> Context::LineColumnFromLocation(Location location) const
 {
     uint32_t line = 1;
     uint32_t column = 1;
 
-    for (uint32_t index = 0; index <= location; index++)
+    for (uint32_t index = 0; index <= location.index; index++)
     {
-        if (fileContent[index] == '\n')
+        if (files.at(location.fileID).content[index] == '\n')
         {
             line++;
             column = 1;
@@ -108,7 +125,7 @@ std::pair<uint32_t, uint32_t> Context::LineColumnFromLocation(uint32_t location)
 [[noreturn]] void Context::Error(Location location, const char* fmt, ...) const
 {
     auto lineColumn = LineColumnFromLocation(location);
-    fprintf(stderr, "%s:%d:%d ", filename.c_str(),lineColumn.first, lineColumn.second);
+    fprintf(stderr, "%s:%d:%d ", files.at(location.fileID).filename.c_str(),lineColumn.first, lineColumn.second);
 
     va_list va;
     va_start(va, fmt);
@@ -125,7 +142,7 @@ void Context::Write(OutputFileType fileType, bool run) const
 {
     assert(!run || fileType == OutputFileType::Executable);
 
-    auto sourceFilenameWithoutExtension = filename.substr(0, filename.length() - filename.substr(filename.find_last_of('.') + 1).length() - 1);
+    auto sourceFilenameWithoutExtension = files.at(0).filename.substr(0, files.at(0).filename.length() - files.at(0).filename.substr(files.at(0).filename.find_last_of('.') + 1).length() - 1);
     auto outputFilename = fileType == OutputFileType::Assembly ? sourceFilenameWithoutExtension + ".asm" : sourceFilenameWithoutExtension + ".o";
 
     std::error_code errorCode;

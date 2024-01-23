@@ -1,6 +1,7 @@
 #include <Context.h>
 #include <Lexer.h>
 #include <Parser.h>
+#include <Preprocessor.h>
 
 #include <argparse/argparse.hpp>
 
@@ -17,6 +18,10 @@ int main(int argc, char** argv)
 
     program.add_argument("-r", "--run")
         .help("run executable")
+        .flag();
+
+    program.add_argument("-O")
+        .help("optimize")
         .flag();
 
     auto& dumpGroup = program.add_mutually_exclusive_group();
@@ -48,23 +53,20 @@ int main(int argc, char** argv)
         exit(1);
     }
 
-    g_context = MakeRef<Context>();
-    g_context->filename = program.get("filename");
-    g_context->fileContent = ReadFile(g_context->filename);
-
-    Lexer lexer;
+    g_context = MakeRef<Context>(program.get("filename"));
     
+    g_context->optimize = program["-O"] == true;
+
+    auto tokenStream = CreateTokenStream(g_context->rootFileID);
+    tokenStream = Preprocess(std::move(tokenStream));
+
     if (program["--dump-tokens"] == true)
     {
-        Token token;
-        do {
-            token = lexer.NextToken();
-            printf("%s\n", token.ToString().c_str());
-        } while (token.type != TokenType::Eof);
+        tokenStream.Dump();
         return 0;
     }
 
-    Parser parser(lexer);
+    Parser parser(std::move(tokenStream));
     auto parsedFile = parser.Parse();
     parsedFile->Typecheck();
     

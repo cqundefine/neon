@@ -9,10 +9,7 @@
 
 struct Context
 {
-    Context();
-
-    std::string filename;
-    std::string fileContent;
+    Context(const std::string& baseFile);
 
     Own<llvm::LLVMContext> llvmContext;
     Own<llvm::IRBuilder<>> builder;
@@ -21,8 +18,21 @@ struct Context
     llvm::TargetMachine* targetMachine;
     llvm::StructType* stringType;
 
+    bool optimize;
+
+    struct FileInfo
+    {
+        std::string filename;
+        std::string content;
+    };
+
+    uint32_t rootFileID;
+    std::map<uint32_t, FileInfo> files;
+
+    uint32_t LoadFile(const std::string& filename);
+
     std::pair<uint32_t, uint32_t> LineColumnFromLocation(Location location) const;
-    [[noreturn]] void Error(uint32_t location, const char* fmt, ...) const;
+    [[noreturn]] void Error(Location location, const char* fmt, ...) const;
 
     enum class OutputFileType
     {

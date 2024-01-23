@@ -25,7 +25,11 @@ constexpr Ref<T> StaticRefCast(const Ref<Base>& base)
     return std::static_pointer_cast<T>(base);
 }
 
-typedef uint32_t Location;
+struct Location
+{
+    uint32_t fileID;
+    size_t index;
+};
 
 inline std::string ReadFile(const std::string& filename)
 {

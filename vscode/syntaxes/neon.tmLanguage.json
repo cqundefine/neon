@@ -21,7 +21,7 @@
 				},
 				{
 					"name": "keyword.neon",
-					"match": "\\b(syscall[0-3])\\b"
+					"match": "\\b(syscall[0-6])\\b"
 				},
 				{
 					"name": "keyword.neon",
@@ -30,6 +30,10 @@
 				{
 					"name": "support.type",
 					"match": "\\b(int8|uint8|int16|uint16|int32|uint32|int64|uint64|void|string)\\b"
+				},
+				{
+					"name": "meta.preprocessor",
+					"match": "\\binclude\\b"
 				}
 			]
 		},
@@ -45,10 +49,24 @@
 			]
 		},
 		"numbers": {
-			"patterns": [{
-				"name": "constant.numeric.neon",
-				"match": "\\b\\d+\\b"
-			}]
+			"patterns": [
+				{
+					"name": "constant.numeric.neon",
+					"match": "\\b\\d+\\b"
+				},
+				{
+					"name": "constant.numeric.hex.neon",
+					"match": "\\b0x[0-9a-fA-f]+\\b"
+				},
+				{
+					"name": "constant.numeric.binary.neon",
+					"match": "\\b0b[01]+\\b"
+				},
+				{
+					"name": "constant.numeric.octal.neon",
+					"match": "\\b0o[0-7]+\\b"
+				}
+			]
 		}
 	},
 	"scopeName": "source.ne"

@@ -40,6 +40,7 @@ enum class TokenType
     If,
     Extern,
     While,
+    Include,
 
     _TokenTypeCount
 };
@@ -53,7 +54,6 @@ struct Token
     std::string stringValue;
     uint64_t intValue;
 
-    size_t length;
     Location location;
 
     std::string ToString();

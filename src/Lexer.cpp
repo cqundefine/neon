@@ -1,258 +1,308 @@
 #include <Lexer.h>
 
-Token Lexer::NextToken() const
+TokenStream CreateTokenStream(uint32_t fileID)
 {
-    static_assert(static_cast<uint32_t>(TokenType::_TokenTypeCount) == 31, "Not all tokens are handled in Lexer::NextToken()");
+    static_assert(static_cast<uint32_t>(TokenType::_TokenTypeCount) == 32, "Not all tokens are handled in Lexer::NextToken()");
 
-    uint32_t beginIndex = m_index;
+    std::vector<Token> tokens;
+    size_t index = 0;
+    auto file = g_context->files.at(fileID).content;
 
-    if (m_index >= g_context->fileContent.size())
-        return { .type = TokenType::Eof };
-    
-    while(g_context->fileContent[m_index] == ' ' || g_context->fileContent[m_index] == '\t' || g_context->fileContent[m_index] == '\n' || g_context->fileContent[m_index] == '\r')
+    while (true)
     {
-        m_index++;
-        if (m_index >= g_context->fileContent.size())
-            return { .type = TokenType::Eof };
-    }
-
-    if (g_context->fileContent[m_index] == '(')
-    {
-        m_index++;
-        return { .type = TokenType::LParen, .length = m_index - beginIndex, .location = m_index - 1 };
-    }
-    else if (g_context->fileContent[m_index] == ')')
-    {
-        m_index++;
-        return { .type = TokenType::RParen, .length = m_index - beginIndex, .location = m_index - 1 };
-    }
-    else if (g_context->fileContent[m_index] == '{')
-    {
-        m_index++;
-        return { .type = TokenType::LCurly, .length = m_index - beginIndex, .location = m_index - 1 };
-    }
-    else if (g_context->fileContent[m_index] == '}')
-    {
-        m_index++;
-        return { .type = TokenType::RCurly, .length = m_index - beginIndex, .location = m_index - 1 };
-    }
-    else if (g_context->fileContent[m_index] == '[')
-    {
-        m_index++;
-        return { .type = TokenType::LSquareBracket, .length = m_index - beginIndex, .location = m_index - 1 };
-    }
-    else if (g_context->fileContent[m_index] == ']')
-    {
-        m_index++;
-        return { .type = TokenType::RSquareBracket, .length = m_index - beginIndex, .location = m_index - 1 };
-    }
-    else if (g_context->fileContent[m_index] == ':')
-    {
-        m_index++;
-        return { .type = TokenType::Colon, .length = m_index - beginIndex, .location = m_index - 1 };
-    }
-    else if (g_context->fileContent[m_index] == ';')
-    {
-        m_index++;
-        return { .type = TokenType::Semicolon, .length = m_index - beginIndex, .location = m_index - 1 };
-    }
-    else if (g_context->fileContent[m_index] == '+')
-    {
-        m_index++;
-        return { .type = TokenType::Plus, .length = m_index - beginIndex, .location = m_index - 1 };
-    }
-    else if (g_context->fileContent[m_index] == '-')
-    {
-        m_index++;
-        return { .type = TokenType::Minus, .length = m_index - beginIndex, .location = m_index - 1 };
-    }
-    else if (g_context->fileContent[m_index] == '*')
-    {
-        m_index++;
-        return { .type = TokenType::Asterisk, .length = m_index - beginIndex, .location = m_index - 1 };
-    }
-    else if (g_context->fileContent[m_index] == '/')
-    {
-        m_index++;
-        if (g_context->fileContent[m_index] == '/')
+        if (index >= file.size())
         {
-            m_index++;
-            while(g_context->fileContent[m_index] != '\n')
-                m_index++;
-            return NextToken();
+            tokens.push_back({ .type = TokenType::Eof });
+            break;
         }
-        else if (g_context->fileContent[m_index] == '*')
+        
+        while(file[index] == ' ' || file[index] == '\t' || file[index] == '\n' || file[index] == '\r')
         {
-            m_index++;
-            while(!(g_context->fileContent[m_index] == '*' && g_context->fileContent[m_index + 1] == '/'))
-                m_index++;
-            m_index += 2;
-            return NextToken();
-        }
-        return { .type = TokenType::Slash, .length = m_index - beginIndex, .location = m_index - 1 };
-    }
-    else if (g_context->fileContent[m_index] == ',')
-    {
-        m_index++;
-        return { .type = TokenType::Comma, .length = m_index - beginIndex, .location = m_index - 1 };
-    }
-    else if (g_context->fileContent[m_index] == '=')
-    {
-        m_index++;
-        if (g_context->fileContent[m_index] == '=')
-        {
-            m_index++;
-            return { .type = TokenType::DoubleEquals, .length = m_index - beginIndex, .location = m_index - 2 };
-        }
-
-        return { .type = TokenType::Equals, .length = m_index - beginIndex, .location = m_index - 1 };
-    }
-    else if (g_context->fileContent[m_index] == '>')
-    {
-        m_index++;
-        if (g_context->fileContent[m_index] == '=')
-        {
-            m_index++;
-            return { .type = TokenType::GreaterThanOrEqual, .length = m_index - beginIndex, .location = m_index - 2 };
-        }
-        return { .type = TokenType::GreaterThan, .length = m_index - beginIndex, .location = m_index - 1 };
-    }
-    else if (g_context->fileContent[m_index] == '<')
-    {
-        m_index++;
-        if (g_context->fileContent[m_index] == '=')
-        {
-            m_index++;
-            return { .type = TokenType::LessThanOrEqual, .length = m_index - beginIndex, .location = m_index - 2 };
-        }
-        return { .type = TokenType::LessThan, .length = m_index - beginIndex, .location = m_index - 1 };
-    }
-    else if (g_context->fileContent[m_index] == '!')
-    {
-        m_index++;
-        if (g_context->fileContent[m_index] == '=')
-        {
-            m_index++;
-            return { .type = TokenType::NotEqual, .length = m_index - beginIndex, .location = m_index - 2 };
-        }
-        return { .type = TokenType::ExclamationMark, .length = m_index - beginIndex, .location = m_index - 1 };
-    }
-    else if (g_context->fileContent[m_index] == '.')
-    {
-        m_index++;
-        return { .type = TokenType::Dot, .length = m_index - beginIndex, .location = m_index - 1 };
-    }
-    else if (g_context->fileContent[m_index] == '"')
-    {
-        uint32_t trueBeginIndex = m_index;
-        std::string value;
-        m_index++;
-        do {
-            char c = g_context->fileContent[m_index];
-            if (c == '\\')
+            index++;
+            if (index >= file.size())
             {
-                m_index++;
-                if (g_context->fileContent[m_index] == 'n')
+                tokens.push_back({ .type = TokenType::Eof });
+                break;
+            }
+        }
+
+        if (file[index] == '(')
+        {
+            index++;
+            tokens.push_back({ .type = TokenType::LParen, .location = { fileID, index - 1 } });
+            continue;
+        }
+        else if (file[index] == ')')
+        {
+            index++;
+            tokens.push_back({ .type = TokenType::RParen, .location = { fileID, index - 1 } });
+            continue;
+        }
+        else if (file[index] == '{')
+        {
+            index++;
+            tokens.push_back({ .type = TokenType::LCurly, .location = { fileID, index - 1 } });
+            continue;
+        }
+        else if (file[index] == '}')
+        {
+            index++;
+            tokens.push_back({ .type = TokenType::RCurly, .location = { fileID, index - 1 } });
+            continue;
+        }
+        else if (file[index] == '[')
+        {
+            index++;
+            tokens.push_back({ .type = TokenType::LSquareBracket, .location = { fileID, index - 1 } });
+            continue;
+        }
+        else if (file[index] == ']')
+        {
+            index++;
+            tokens.push_back({ .type = TokenType::RSquareBracket, .location = { fileID, index - 1 } });
+            continue;
+        }
+        else if (file[index] == ':')
+        {
+            index++;
+            tokens.push_back({ .type = TokenType::Colon, .location = { fileID, index - 1 } });
+            continue;
+        }
+        else if (file[index] == ';')
+        {
+            index++;
+            tokens.push_back({ .type = TokenType::Semicolon, .location = { fileID, index - 1 } });
+            continue;
+        }
+        else if (file[index] == '+')
+        {
+            index++;
+            tokens.push_back({ .type = TokenType::Plus, .location = { fileID, index - 1 } });
+            continue;
+        }
+        else if (file[index] == '-')
+        {
+            index++;
+            tokens.push_back({ .type = TokenType::Minus, .location = { fileID, index - 1 } });
+            continue;
+        }
+        else if (file[index] == '*')
+        {
+            index++;
+            tokens.push_back({ .type = TokenType::Asterisk, .location = { fileID, index - 1 } });
+            continue;
+        }
+        else if (file[index] == '/')
+        {
+            index++;
+            if (file[index] == '/')
+            {
+                index++;
+                while(file[index] != '\n')
+                    index++;
+                continue;
+            }
+            else if (file[index] == '*')
+            {
+                index++;
+                while(!(file[index] == '*' && file[index + 1] == '/'))
+                    index++;
+                index += 2;
+                continue;
+            }
+            tokens.push_back({ .type = TokenType::Slash, .location = { fileID, index - 1 } });
+            continue;
+        }
+        else if (file[index] == ',')
+        {
+            index++;
+            tokens.push_back({ .type = TokenType::Comma, .location = { fileID, index - 1 } });
+            continue;
+        }
+        else if (file[index] == '=')
+        {
+            index++;
+            if (file[index] == '=')
+            {
+                index++;
+                tokens.push_back({ .type = TokenType::DoubleEquals, .location = { fileID, index - 2 } });
+                continue;
+            }
+
+            tokens.push_back({ .type = TokenType::Equals, .location = { fileID, index - 1 } });
+            continue;
+        }
+        else if (file[index] == '>')
+        {
+            index++;
+            if (file[index] == '=')
+            {
+                index++;
+                tokens.push_back({ .type = TokenType::GreaterThanOrEqual, .location = { fileID, index - 2 } });
+                continue;
+            }
+            tokens.push_back({ .type = TokenType::GreaterThan, .location = { fileID, index - 1 } });
+            continue;
+        }
+        else if (file[index] == '<')
+        {
+            index++;
+            if (file[index] == '=')
+            {
+                index++;
+                tokens.push_back({ .type = TokenType::LessThanOrEqual, .location = { fileID, index - 2 } });
+                continue;
+            }
+            tokens.push_back({ .type = TokenType::LessThan, .location = { fileID, index - 1 } });
+            continue;
+        }
+        else if (file[index] == '!')
+        {
+            index++;
+            if (file[index] == '=')
+            {
+                index++;
+                tokens.push_back({ .type = TokenType::NotEqual, .location = { fileID, index - 2 } });
+                continue;
+            }
+            tokens.push_back({ .type = TokenType::ExclamationMark, .location = { fileID, index - 1 } });
+            continue;
+        }
+        else if (file[index] == '.')
+        {
+            index++;
+            tokens.push_back({ .type = TokenType::Dot, .location = { fileID, index - 1 } });
+            continue;
+        }
+        else if (file[index] == '"')
+        {
+            uint32_t trueBeginIndex = index;
+            std::string value;
+            index++;
+            do {
+                char c = file[index];
+                if (c == '\\')
                 {
-                    value += 10;
-                }
-                else if (g_context->fileContent[m_index] == '\\')
-                {
-                    value += '\\';
+                    index++;
+                    if (file[index] == 'n')
+                    {
+                        value += 10;
+                    }
+                    else if (file[index] == '\\')
+                    {
+                        value += '\\';
+                    }
+                    else
+                    {
+                        g_context->Error({ fileID, index }, "Unknown escape char: %c", file[index]);
+                    }
                 }
                 else
                 {
-                    g_context->Error(m_index, "Unknown escape char: %c", g_context->fileContent[m_index]);
+                    value += c;
+                }
+                index++;
+            } while(file[index] != '"');
+            index++;
+
+            tokens.push_back({
+                .type = TokenType::StringLiteral,
+                .stringValue = value,
+                .location = { fileID, trueBeginIndex }
+            });
+            continue;
+        }
+
+        if (isdigit(file[index]))
+        {
+            uint32_t trueBeginIndex = index;
+            std::string numberString;
+            int base = 10;
+            if (file[index] == '0')
+            {
+                index++;
+                if (file[index] == 'x')
+                {
+                    index++;
+                    base = 16;
+                }
+                else if (file[index] == 'b')
+                {
+                    index++;
+                    base = 2;
+                }
+                else if (file[index] == 'o')
+                {
+                    index++;
+                    base = 8;
+                }
+                else
+                {
+                    index--;
                 }
             }
-            else
-            {
-                value += c;
-            }
-            m_index++;
-        } while(g_context->fileContent[m_index] != '"');
-        m_index++;
+            do {
+                numberString += file[index];
+                index++;
+            } while(isdigit(file[index]));
 
-        return { 
-            .type = TokenType::StringLiteral,
-            .stringValue = value,
-            .length = m_index - beginIndex,
-            .location = trueBeginIndex
-        };
-    }
-
-    if (isdigit(g_context->fileContent[m_index]))
-    {
-        uint32_t trueBeginIndex = m_index;
-        std::string numberString;
-        int base = 10;
-        if (g_context->fileContent[m_index] == '0')
-        {
-            m_index++;
-            if (g_context->fileContent[m_index] == 'x')
-            {
-                m_index++;
-                base = 16;
-            }
-            else if (g_context->fileContent[m_index] == 'b')
-            {
-                m_index++;
-                base = 2;
-            }
-            else if (g_context->fileContent[m_index] == 'o')
-            {
-                m_index++;
-                base = 8;
-            }
-            else
-            {
-                m_index--;
-            }
+            tokens.push_back({
+                .type = TokenType::Number,
+                .intValue = std::strtoull(numberString.c_str(), 0, base),
+                .location = { fileID, trueBeginIndex }
+            });
+            continue;
         }
-        do {
-            numberString += g_context->fileContent[m_index];
-            m_index++;
-        } while(isdigit(g_context->fileContent[m_index]));
+        else if (isalpha(file[index]) || file[index] == '_')
+        {
+            uint32_t trueBeginIndex = index;
+            std::string value;
+            do {
+                value += file[index];
+                index++;
+            } while(isalnum(file[index])  || file[index] == '_');
+        
+            if (value == "function")
+            {
+                tokens.push_back({ .type = TokenType::Function, .location = { fileID, trueBeginIndex } });
+                continue;
+            }
+            else if (value == "return")
+            {
+                tokens.push_back({ .type = TokenType::Return, .location = { fileID, trueBeginIndex } });
+                continue;
+            }
+            else if (value == "if")
+            {
+                tokens.push_back({ .type = TokenType::If, .location = { fileID, trueBeginIndex } });
+                continue;
+            }
+            else if (value == "extern")
+            {
+                tokens.push_back({ .type = TokenType::Extern, .location = { fileID, trueBeginIndex } });
+                continue;
+            }
+            else if (value == "while")
+            {
+                tokens.push_back({ .type = TokenType::While, .location = { fileID, trueBeginIndex } });
+                continue;
+            }
+            else if (value == "include")
+            {
+                tokens.push_back({ .type = TokenType::Include, .location = { fileID, trueBeginIndex } });
+                continue;
+            }
+            else
+                tokens.push_back({ 
+                    .type = TokenType::Identifier,
+                    .stringValue = value,
+                    .location = { fileID, trueBeginIndex }
+                });
+            continue;
+        }
 
-        return {
-            .type = TokenType::Number,
-            .intValue = std::strtoull(numberString.c_str(), 0, base),
-            .length = m_index - beginIndex,
-            .location = trueBeginIndex
-        };
+        g_context->Error({ fileID, index }, "Unexpected symbol: `%c`", file[index]);
     }
-    else if (isalpha(g_context->fileContent[m_index]) || g_context->fileContent[m_index] == '_')
-    {
-        uint32_t trueBeginIndex = m_index;
-        std::string value;
-        do {
-            value += g_context->fileContent[m_index];
-            m_index++;
-        } while(isalnum(g_context->fileContent[m_index])  || g_context->fileContent[m_index] == '_');
-    
-        if (value == "function")
-            return { .type = TokenType::Function, .length = m_index - beginIndex, .location = trueBeginIndex };
-        else if (value == "return")
-            return { .type = TokenType::Return, .length = m_index - beginIndex, .location = trueBeginIndex };
-        else if (value == "if")
-            return { .type = TokenType::If, .length = m_index - beginIndex, .location = trueBeginIndex };
-        else if (value == "extern")
-            return { .type = TokenType::Extern, .length = m_index - beginIndex, .location = trueBeginIndex };
-        else if (value == "while")
-            return { .type = TokenType::While, .length = m_index - beginIndex, .location = trueBeginIndex };
-        else
-            return { 
-                .type = TokenType::Identifier,
-                .stringValue = value,
-                .length = m_index - beginIndex,
-                .location = trueBeginIndex
-            };
-    }
 
-    g_context->Error(m_index, "Unexpected symbol: %c", g_context->fileContent[m_index]);
-}
-
-void Lexer::RollbackToken(Token token) const
-{
-    m_index -= token.length;
+    return TokenStream(tokens);
 }

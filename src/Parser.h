@@ -2,13 +2,16 @@
 
 #include <AST.h>
 #include <Enums.h>
-#include <Lexer.h>
+#include <TokenStream.h>
 #include <llvm/IR/Type.h>
 
 class Parser
 {
 public:
-    inline explicit Parser(const Lexer& lexer) : m_lexer(lexer) {}
+    explicit inline Parser(TokenStream stream)
+        : m_stream(std::move(stream))
+    {
+    }
 
     Ref<ParsedFile> Parse();
 
@@ -23,5 +26,5 @@ private:
 
     void ExpectToken(TokenType tokenType);
 
-    const Lexer& m_lexer;
+    TokenStream m_stream;
 };

@@ -2,17 +2,17 @@
 #include <Context.h>
 #include <llvm/IR/Type.h>
 
-std::vector<std::map<std::string, Ref<Type>>> typecheckBlockStack;
-[[nodiscard]] Ref<Type> FindVariable(const std::string& name)
+static std::vector<std::map<std::string, Ref<Type>>> blockStack;
+[[nodiscard]] static Ref<Type> FindVariable(const std::string& name, Location location)
 {
-    for (int i = typecheckBlockStack.size() - 1; i >= 0; i--)
+    for (int i = blockStack.size() - 1; i >= 0; i--)
     {
-        const auto& block = typecheckBlockStack.at(i);
+        const auto& block = blockStack.at(i);
         if (block.contains(name))
             return block.at(name);
     }
 
-    g_context->Error(0, "Can't find variable: %s", name.c_str());
+    g_context->Error(location, "Can't find variable: %s", name.c_str());
 }
 
 static std::string typecheckCurrentFunction;
@@ -31,7 +31,7 @@ void NumberExpressionAST::Typecheck() const
 
 void VariableExpressionAST::Typecheck() const
 {
-    type = FindVariable(name);
+    type = FindVariable(name, location);
 }
 
 void StringLiteralAST::Typecheck() const
@@ -106,7 +106,7 @@ void MemberAccessExpressionAST::Typecheck() const
 
 void ReturnStatementAST::Typecheck() const
 {
-    returnedType = FindVariable(typecheckCurrentFunction);
+    returnedType = FindVariable(typecheckCurrentFunction, location);
 
     // FIXME: Check if correct type is returned
     value->Typecheck();
@@ -114,7 +114,7 @@ void ReturnStatementAST::Typecheck() const
 
 void BlockAST::Typecheck() const
 {
-    typecheckBlockStack.push_back({});
+    blockStack.push_back({});
 
     for (const auto& statement : statements)
     {
@@ -124,7 +124,7 @@ void BlockAST::Typecheck() const
             std::get<Ref<ExpressionAST>>(statement)->Typecheck();   
     }
 
-    typecheckBlockStack.pop_back();
+    blockStack.pop_back();
 }
 
 void IfStatementAST::Typecheck() const
@@ -152,34 +152,39 @@ void VariableDefinitionAST::Typecheck() const
         }
         initialValue->Typecheck();
     }
-    typecheckBlockStack.back()[name] = type;
+    blockStack.back()[name] = type;
     // Check if default assignment is correct
 }
 
 void FunctionAST::Typecheck() const
 {
     typecheckCurrentFunction = name;
+    blockStack.push_back({});
 
-    typecheckBlockStack.back()[name] = returnType;
-
-    if (block != nullptr)
-        block->Typecheck();
+    blockStack.back()[name] = returnType;
     
     std::vector<Ref<Type>> typecheckParams;
     for (const auto& param : params)
+    {
         typecheckParams.push_back(param.type);
+        blockStack.back()[param.name] = param.type;
+    }
 
     typecheckFunctions[name] = {
         .params = typecheckParams,
         .returnType = returnType
     };
 
+    if (block != nullptr)
+        block->Typecheck();
+
+    blockStack.pop_back();
     typecheckCurrentFunction = "";
 }
 
 void ParsedFile::Typecheck() const
 {
-    typecheckBlockStack.push_back({});
+    blockStack.push_back({});
 
     auto int64 = MakeRef<IntegerType>(64, false);
     typecheckFunctions["syscall0"] = {{ int64 }};
@@ -193,5 +198,7 @@ void ParsedFile::Typecheck() const
     for (const auto& function : functions)
         function->Typecheck();
 
-    typecheckBlockStack.pop_back();
+    blockStack.pop_back();
+
+    assert(blockStack.size() == 0);
 }
