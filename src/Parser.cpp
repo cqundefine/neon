@@ -24,7 +24,7 @@ Ref<ParsedFile> Parser::Parse()
                 ExpectToken(TokenType::Colon);
                 auto type = ParseType();
 
-                params.push_back({maybeName.stringValue, type});
+                params.push_back({ maybeName.stringValue, type });
 
                 Token maybeComma = m_stream.NextToken();
                 if (maybeComma.type != TokenType::Comma)
@@ -37,9 +37,9 @@ Ref<ParsedFile> Parser::Parse()
 
             ExpectToken(TokenType::RParen);
             ExpectToken(TokenType::Colon);
-            
+
             auto returnType = ParseType(true);
-            
+
             Ref<BlockAST> block;
             if (token.type == TokenType::Extern)
                 ExpectToken(TokenType::Semicolon);
@@ -64,10 +64,10 @@ Ref<BlockAST> Parser::ParseBlock()
     auto lcurly = m_stream.NextToken();
     assert(lcurly.type == TokenType::LCurly);
     Token token = m_stream.NextToken();
-    
+
     std::vector<ExpressionOrStatement> statements;
 
-    while(token.type != TokenType::RCurly)
+    while (token.type != TokenType::RCurly)
     {
         m_stream.PreviousToken();
         statements.push_back(ParseStatement());
@@ -161,7 +161,7 @@ Ref<ExpressionAST> Parser::ParseExpression()
 
     {
         Token token = m_stream.NextToken();
-        while(token.type == TokenType::LParen)
+        while (token.type == TokenType::LParen)
         {
             parenCount++;
             token = m_stream.NextToken();
@@ -172,17 +172,17 @@ Ref<ExpressionAST> Parser::ParseExpression()
     auto leftSide = ParsePrimary();
     expressionStack.push(leftSide);
 
-    while(true)
+    while (true)
     {
         auto operation = ParseOperation();
-        if(operation.first == BinaryOperation::_BinaryOperationCount)
+        if (operation.first == BinaryOperation::_BinaryOperationCount)
             break;
 
         int precedence = BinaryOperationPrecedence[operation.first] + parenCount * 1000;
 
         {
             Token token = m_stream.NextToken();
-            while(token.type == TokenType::LParen)
+            while (token.type == TokenType::LParen)
             {
                 parenCount++;
                 token = m_stream.NextToken();
@@ -195,7 +195,7 @@ Ref<ExpressionAST> Parser::ParseExpression()
         if (parenCount > 0)
         {
             Token token = m_stream.NextToken();
-            while(token.type == TokenType::RParen)
+            while (token.type == TokenType::RParen)
             {
                 parenCount--;
                 token = m_stream.NextToken();
@@ -234,7 +234,7 @@ Ref<ExpressionAST> Parser::ParseExpression()
     if (parenCount > 0)
     {
         Token token = m_stream.NextToken();
-        while(token.type == TokenType::RParen)
+        while (token.type == TokenType::RParen)
         {
             parenCount--;
             token = m_stream.NextToken();
@@ -261,7 +261,7 @@ Ref<ExpressionAST> Parser::ParsePrimary()
 {
     auto primary = ParseBarePrimary();
     Token token = m_stream.NextToken();
-    while(token.type == TokenType::Dot)
+    while (token.type == TokenType::Dot)
     {
         auto member = m_stream.NextToken();
         assert(member.type == TokenType::Identifier);
@@ -280,14 +280,14 @@ Ref<ExpressionAST> Parser::ParseBarePrimary()
     {
         return MakeRef<NumberExpressionAST>(first.location, first.intValue, MakeRef<IntegerType>(32, true));
     }
-    else if(first.type == TokenType::Identifier)
+    else if (first.type == TokenType::Identifier)
     {
         Token second = m_stream.NextToken();
         if (second.type == TokenType::LParen)
         {
             std::vector<Ref<ExpressionAST>> args;
             Token arg = m_stream.NextToken();
-            while(arg.type != TokenType::RParen)
+            while (arg.type != TokenType::RParen)
             {
                 if (arg.type != TokenType::Comma)
                 {
@@ -341,7 +341,7 @@ Ref<ExpressionAST> Parser::ParseBarePrimary()
 std::pair<BinaryOperation, Location> Parser::ParseOperation()
 {
     static_assert(static_cast<uint32_t>(BinaryOperation::_BinaryOperationCount) == 11, "Not all binary operations are handled in Parser::ParseOperation()");
-    
+
     Token token = m_stream.NextToken();
     switch (token.type)
     {

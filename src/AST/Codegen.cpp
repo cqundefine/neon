@@ -20,7 +20,6 @@ static std::vector<std::map<std::string, llvm::AllocaInst*>> blockStack;
     g_context->Error(location, "Can't find variable: %s", name.c_str());
 }
 
-
 llvm::Value* NumberExpressionAST::Codegen() const
 {
     return llvm::ConstantInt::get(*g_context->llvmContext, llvm::APInt(type->bits, value, type->isSigned));
@@ -34,14 +33,14 @@ llvm::Value* VariableExpressionAST::Codegen() const
 
 llvm::Value* StringLiteralAST::Codegen() const
 {
-    std::vector<llvm::Constant *> chars(value.size());
-    for(uint8_t i = 0; i < value.size(); i++)
+    std::vector<llvm::Constant*> chars(value.size());
+    for (uint8_t i = 0; i < value.size(); i++)
         chars[i] = llvm::ConstantInt::get(*g_context->llvmContext, llvm::APInt(8, value[i], true));
-    
+
     auto charArray = llvm::ConstantArray::get(llvm::ArrayType::get(llvm::Type::getInt8Ty(*g_context->llvmContext), chars.size()), chars);
     auto rawString = new llvm::GlobalVariable(*g_context->module, charArray->getType(), true, llvm::GlobalValue::PrivateLinkage, charArray);
     auto stringStruct = llvm::ConstantStruct::get(g_context->stringType, { llvm::ConstantExpr::getBitCast(rawString, llvm::Type::getInt8PtrTy(*g_context->llvmContext)), llvm::ConstantInt::get(*g_context->llvmContext, llvm::APInt(64, value.size())) });
-    
+
     llvm::GlobalVariable* globalVariable = new llvm::GlobalVariable(*g_context->module, stringStruct->getType(), true, llvm::GlobalVariable::ExternalLinkage, stringStruct);
     return globalVariable;
 }
@@ -52,18 +51,18 @@ llvm::Value* BinaryExpressionAST::Codegen() const
 
     if (binaryOperation == BinaryOperation::Assignment)
     {
-        if(lhs->type == ExpressionType::Variable)
+        if (lhs->type == ExpressionType::Variable)
         {
             auto variableLHS = StaticRefCast<VariableExpressionAST>(lhs);
             g_context->builder->CreateStore(rhs->Codegen(), FindVariable(variableLHS->name, location));
         }
-        else if(lhs->type == ExpressionType::ArrayAccess)
+        else if (lhs->type == ExpressionType::ArrayAccess)
         {
             auto arrayLHS = StaticRefCast<ArrayAccessExpressionAST>(lhs);
             auto gep = g_context->builder->CreateGEP(FindVariable(arrayLHS->array->name, location)->getAllocatedType(), FindVariable(arrayLHS->array->name, location), arrayLHS->index->Codegen(), "gep");
             g_context->builder->CreateStore(rhs->Codegen(), gep);
         }
-        else if(lhs->type == ExpressionType::Dereference)
+        else if (lhs->type == ExpressionType::Dereference)
         {
             auto dereferenceLHS = StaticRefCast<DereferenceExpressionAST>(lhs);
             g_context->builder->CreateStore(rhs->Codegen(), dereferenceLHS->pointer->Codegen());
@@ -73,18 +72,18 @@ llvm::Value* BinaryExpressionAST::Codegen() const
             assert(false);
         }
         return nullptr;
-        //return lhs->Codegen();
+        // return lhs->Codegen();
     }
-    else if(lhs->GetType()->type == TypeEnum::Integer && rhs->GetType()->type == TypeEnum::Integer)
+    else if (lhs->GetType()->type == TypeEnum::Integer && rhs->GetType()->type == TypeEnum::Integer)
     {
         assert(*lhs->GetType() == *rhs->GetType());
-        
+
         auto isLHSSigned = StaticRefCast<IntegerType>(lhs->GetType())->isSigned;
 
         auto lhsCodegenned = lhs->Codegen();
         auto rhsCodegenned = g_context->builder->CreateIntCast(rhs->Codegen(), lhsCodegenned->getType(), isLHSSigned, "intcast");
 
-        switch(binaryOperation)
+        switch (binaryOperation)
         {
             case BinaryOperation::Add:
                 return g_context->builder->CreateAdd(lhsCodegenned, rhsCodegenned, "add");
@@ -166,11 +165,11 @@ llvm::Value* MemberAccessExpressionAST::Codegen() const
 {
     assert(object->GetType()->type == TypeEnum::String);
     auto structType = StaticRefCast<StringType>(object->GetType())->GetUnderlayingType();
-    
+
     // FIXME: Unhardcode this when we have proper struct types
     auto elementIndex = memberName == "size" ? 1 : 0;
     auto elementType = memberName == "size" ? (llvm::Type*)llvm::Type::getInt64Ty(*g_context->llvmContext) : (llvm::Type*)llvm::Type::getInt8PtrTy(*g_context->llvmContext);
-    
+
     if (object->type == ExpressionType::StringLiteral)
     {
         auto gep = g_context->builder->CreateStructGEP(structType, StaticRefCast<StringLiteralAST>(object)->Codegen(), elementIndex, "gep");
@@ -201,7 +200,7 @@ void BlockAST::Codegen() const
 {
     blockStack.push_back({});
 
-    for(const auto& statement : statements)
+    for (const auto& statement : statements)
     {
         if (std::holds_alternative<Ref<StatementAST>>(statement))
             std::get<Ref<StatementAST>>(statement)->Codegen();
@@ -213,10 +212,10 @@ void BlockAST::Codegen() const
 }
 
 void IfStatementAST::Codegen() const
-{  
+{
     auto conditionFinal = g_context->builder->CreateICmpNE(condition->Codegen(), llvm::ConstantInt::get(*g_context->llvmContext, llvm::APInt(1, 0)), "ifcmpne");
     auto parentFunction = g_context->builder->GetInsertBlock()->getParent();
-    
+
     auto thenBlock = llvm::BasicBlock::Create(*g_context->llvmContext, "then", parentFunction);
     llvm::BasicBlock* elseBlockB;
     if (elseBlock != nullptr)
@@ -245,9 +244,9 @@ void IfStatementAST::Codegen() const
 }
 
 void WhileStatementAST::Codegen() const
-{  
+{
     auto parentFunction = g_context->builder->GetInsertBlock()->getParent();
-    
+
     auto loopCond = llvm::BasicBlock::Create(*g_context->llvmContext, "loopCond", parentFunction);
     auto loopBody = llvm::BasicBlock::Create(*g_context->llvmContext, "loopBody");
     auto loopEnd = llvm::BasicBlock::Create(*g_context->llvmContext, "loopEnd");
@@ -255,10 +254,10 @@ void WhileStatementAST::Codegen() const
     g_context->builder->CreateBr(loopCond);
 
     g_context->builder->SetInsertPoint(loopCond);
-    
+
     auto conditionFinal = g_context->builder->CreateICmpNE(condition->Codegen(), llvm::ConstantInt::get(*g_context->llvmContext, llvm::APInt(1, 0)), "whilecmpne");
     g_context->builder->CreateCondBr(conditionFinal, loopBody, loopEnd);
-    
+
     parentFunction->getBasicBlockList().push_back(loopBody);
     g_context->builder->SetInsertPoint(loopBody);
 
@@ -274,9 +273,9 @@ void VariableDefinitionAST::Codegen() const
     auto parentFunction = g_context->builder->GetInsertBlock()->getParent();
     llvm::IRBuilder<> functionBeginBuilder(&parentFunction->getEntryBlock(), parentFunction->getEntryBlock().begin());
     auto size = type->type == TypeEnum::Array ? llvm::ConstantInt::get(*g_context->llvmContext, llvm::APInt(64, StaticRefCast<ArrayType>(type)->size)) : nullptr;
-    
+
     blockStack.back()[name] = functionBeginBuilder.CreateAlloca(type->GetType(), size, name);
-    
+
     if (initialValue != nullptr)
         g_context->builder->CreateStore(initialValue->Codegen(), FindVariable(name, location));
 }
@@ -317,10 +316,9 @@ llvm::Function* FunctionAST::Codegen() const
 
         if (g_context->optimize)
             g_context->functionPassManager->run(*function);
-        
+
         blockStack.pop_back();
     }
-
 
     return function;
 }

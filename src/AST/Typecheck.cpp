@@ -26,7 +26,6 @@ static std::map<std::string, TypecheckFunction> typecheckFunctions;
 
 void NumberExpressionAST::Typecheck() const
 {
-
 }
 
 void VariableExpressionAST::Typecheck() const
@@ -36,21 +35,20 @@ void VariableExpressionAST::Typecheck() const
 
 void StringLiteralAST::Typecheck() const
 {
-
 }
 
 void BinaryExpressionAST::Typecheck() const
 {
     lhs->Typecheck();
     rhs->Typecheck();
-    
+
     if (rhs->type == ExpressionType::Number && lhs->GetType()->type == TypeEnum::Integer)
         StaticRefCast<NumberExpressionAST>(rhs)->AdjustType(StaticRefCast<IntegerType>(lhs->GetType()));
 
-    if(*lhs->GetType() != *rhs->GetType())
+    if (*lhs->GetType() != *rhs->GetType())
         g_context->Error(location, "Wrong binary operation: %s with type %s", lhs->GetType()->Dump().c_str(), rhs->GetType()->Dump().c_str());
-    
-    if(binaryOperation == BinaryOperation::Assignment && lhs->type != ExpressionType::Variable && lhs->type != ExpressionType::ArrayAccess && lhs->type != ExpressionType::Dereference)
+
+    if (binaryOperation == BinaryOperation::Assignment && lhs->type != ExpressionType::Variable && lhs->type != ExpressionType::ArrayAccess && lhs->type != ExpressionType::Dereference)
         g_context->Error(location, "Can't assign to non-variable expression");
 
     // FIXME: Check if variable exists in the current scope
@@ -60,9 +58,9 @@ void CallExpressionAST::Typecheck() const
 {
     assert(typecheckFunctions.count(calleeName));
     auto function = typecheckFunctions[calleeName];
-    
+
     returnedType = function.returnType;
-    
+
     assert(function.params.size() == args.size());
     for (int i = 0; i < args.size(); i++)
     {
@@ -121,7 +119,7 @@ void BlockAST::Typecheck() const
         if (std::holds_alternative<Ref<StatementAST>>(statement))
             std::get<Ref<StatementAST>>(statement)->Typecheck();
         else
-            std::get<Ref<ExpressionAST>>(statement)->Typecheck();   
+            std::get<Ref<ExpressionAST>>(statement)->Typecheck();
     }
 
     blockStack.pop_back();
@@ -162,7 +160,7 @@ void FunctionAST::Typecheck() const
     blockStack.push_back({});
 
     blockStack.back()[name] = returnType;
-    
+
     std::vector<Ref<Type>> typecheckParams;
     for (const auto& param : params)
     {
@@ -187,13 +185,13 @@ void ParsedFile::Typecheck() const
     blockStack.push_back({});
 
     auto int64 = MakeRef<IntegerType>(64, false);
-    typecheckFunctions["syscall0"] = {{ int64 }};
-    typecheckFunctions["syscall1"] = {{ int64, int64 }};
-    typecheckFunctions["syscall2"] = {{ int64, int64, int64 }};
-    typecheckFunctions["syscall3"] = {{ int64, int64, int64, int64 }};
-    typecheckFunctions["syscall4"] = {{ int64, int64, int64, int64, int64 }};
-    typecheckFunctions["syscall5"] = {{ int64, int64, int64, int64, int64, int64 }};
-    typecheckFunctions["syscall6"] = {{ int64, int64, int64, int64, int64, int64, int64 }};
+    typecheckFunctions["syscall0"] = { { int64 } };
+    typecheckFunctions["syscall1"] = { { int64, int64 } };
+    typecheckFunctions["syscall2"] = { { int64, int64, int64 } };
+    typecheckFunctions["syscall3"] = { { int64, int64, int64, int64 } };
+    typecheckFunctions["syscall4"] = { { int64, int64, int64, int64, int64 } };
+    typecheckFunctions["syscall5"] = { { int64, int64, int64, int64, int64, int64 } };
+    typecheckFunctions["syscall6"] = { { int64, int64, int64, int64, int64, int64, int64 } };
 
     for (const auto& function : functions)
         function->Typecheck();

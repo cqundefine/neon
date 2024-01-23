@@ -54,7 +54,7 @@ int main(int argc, char** argv)
     }
 
     g_context = MakeRef<Context>(program.get("filename"));
-    
+
     g_context->optimize = program["-O"] == true;
 
     auto tokenStream = CreateTokenStream(g_context->rootFileID);
@@ -69,7 +69,7 @@ int main(int argc, char** argv)
     Parser parser(std::move(tokenStream));
     auto parsedFile = parser.Parse();
     parsedFile->Typecheck();
-    
+
     if (program["--dump-ast"] == true)
     {
         parsedFile->Dump();

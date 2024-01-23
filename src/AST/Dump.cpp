@@ -2,7 +2,11 @@
 #include <llvm/IR/Type.h>
 #include <regex>
 
-#define INDENT(count) for (uint32_t i = 0; i < count; i++) { printf("    "); }
+#define INDENT(count)                    \
+    for (uint32_t i = 0; i < count; i++) \
+    {                                    \
+        printf("    ");                  \
+    }
 
 void NumberExpressionAST::Dump(uint32_t indentCount) const
 {
@@ -83,7 +87,7 @@ void BlockAST::Dump(uint32_t indentCount) const
     INDENT(indentCount);
     puts("Block");
 
-    for(const auto& statement : statements)
+    for (const auto& statement : statements)
     {
         if (std::holds_alternative<Ref<StatementAST>>(statement))
             std::get<Ref<StatementAST>>(statement)->Dump(indentCount + 1);

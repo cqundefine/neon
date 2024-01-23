@@ -15,8 +15,8 @@ TokenStream CreateTokenStream(uint32_t fileID)
             tokens.push_back({ .type = TokenType::Eof });
             break;
         }
-        
-        while(file[index] == ' ' || file[index] == '\t' || file[index] == '\n' || file[index] == '\r')
+
+        while (file[index] == ' ' || file[index] == '\t' || file[index] == '\n' || file[index] == '\r')
         {
             index++;
             if (index >= file.size())
@@ -98,14 +98,14 @@ TokenStream CreateTokenStream(uint32_t fileID)
             if (file[index] == '/')
             {
                 index++;
-                while(file[index] != '\n')
+                while (file[index] != '\n')
                     index++;
                 continue;
             }
             else if (file[index] == '*')
             {
                 index++;
-                while(!(file[index] == '*' && file[index + 1] == '/'))
+                while (!(file[index] == '*' && file[index + 1] == '/'))
                     index++;
                 index += 2;
                 continue;
@@ -179,7 +179,8 @@ TokenStream CreateTokenStream(uint32_t fileID)
             uint32_t trueBeginIndex = index;
             std::string value;
             index++;
-            do {
+            do
+            {
                 char c = file[index];
                 if (c == '\\')
                 {
@@ -202,14 +203,12 @@ TokenStream CreateTokenStream(uint32_t fileID)
                     value += c;
                 }
                 index++;
-            } while(file[index] != '"');
+            } while (file[index] != '"');
             index++;
 
-            tokens.push_back({
-                .type = TokenType::StringLiteral,
+            tokens.push_back({ .type = TokenType::StringLiteral,
                 .stringValue = value,
-                .location = { fileID, trueBeginIndex }
-            });
+                .location = { fileID, trueBeginIndex } });
             continue;
         }
 
@@ -241,27 +240,27 @@ TokenStream CreateTokenStream(uint32_t fileID)
                     index--;
                 }
             }
-            do {
+            do
+            {
                 numberString += file[index];
                 index++;
-            } while(isdigit(file[index]));
+            } while (isdigit(file[index]));
 
-            tokens.push_back({
-                .type = TokenType::Number,
+            tokens.push_back({ .type = TokenType::Number,
                 .intValue = std::strtoull(numberString.c_str(), 0, base),
-                .location = { fileID, trueBeginIndex }
-            });
+                .location = { fileID, trueBeginIndex } });
             continue;
         }
         else if (isalpha(file[index]) || file[index] == '_')
         {
             uint32_t trueBeginIndex = index;
             std::string value;
-            do {
+            do
+            {
                 value += file[index];
                 index++;
-            } while(isalnum(file[index])  || file[index] == '_');
-        
+            } while (isalnum(file[index]) || file[index] == '_');
+
             if (value == "function")
             {
                 tokens.push_back({ .type = TokenType::Function, .location = { fileID, trueBeginIndex } });
@@ -293,11 +292,9 @@ TokenStream CreateTokenStream(uint32_t fileID)
                 continue;
             }
             else
-                tokens.push_back({ 
-                    .type = TokenType::Identifier,
+                tokens.push_back({ .type = TokenType::Identifier,
                     .stringValue = value,
-                    .location = { fileID, trueBeginIndex }
-                });
+                    .location = { fileID, trueBeginIndex } });
             continue;
         }
 

@@ -7,7 +7,7 @@
 
 std::string IntegerType::Dump() const
 {
-    return std::string("IntegerType (") + std::to_string(bits) + ", " + (isSigned ? "true" : "false") + ")"; 
+    return std::string("IntegerType (") + std::to_string(bits) + ", " + (isSigned ? "true" : "false") + ")";
 }
 
 std::string StringType::Dump() const
@@ -17,12 +17,12 @@ std::string StringType::Dump() const
 
 std::string ArrayType::Dump() const
 {
-    return std::string("ArrayType (") + arrayType->Dump() + ", " + std::to_string(size) + ")"; 
+    return std::string("ArrayType (") + arrayType->Dump() + ", " + std::to_string(size) + ")";
 }
 
 std::string PointerType::Dump() const
 {
-    return std::string("PointerType (") + underlayingType->Dump() + ")"; 
+    return std::string("PointerType (") + underlayingType->Dump() + ")";
 }
 
 std::string VoidType::Dump() const

@@ -9,7 +9,7 @@ enum class TokenType
     Identifier,
     StringLiteral,
     Eof,
-    
+
     // Symbols
     LParen,
     RParen,

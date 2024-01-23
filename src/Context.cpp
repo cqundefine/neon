@@ -17,24 +17,23 @@ Ref<Context> g_context;
 
 uint32_t lastFileID = 0;
 
-#define CREATE_SYSCALL(N, REGS) \
-    { \
-    auto int64Type = llvm::Type::getInt64Ty(*llvmContext); \
-    std::vector<llvm::Type*> syscall##N##Args {}; \
-    for (uint32_t i = 0; i < N + 1; i++) \
-        syscall##N##Args.push_back(int64Type); \
-    auto syscall##N##Type = llvm::FunctionType::get(int64Type, syscall##N##Args, false); \
-    auto syscall##N = llvm::Function::Create(syscall##N##Type, llvm::Function::LinkageTypes::ExternalLinkage, "syscall" #N, *module); \
-    std::vector<llvm::Value*> syscall##N##ArgsValues {}; \
-    for (auto& arg : syscall##N->args()) \
-        syscall##N##ArgsValues.push_back(&arg); \
-    auto syscall##N##Block = llvm::BasicBlock::Create(*llvmContext, "entry", syscall##N); \
-    builder->SetInsertPoint(syscall##N##Block); \
-    auto syscall##N##AsmCall = llvm::InlineAsm::get(syscall##N##Type, "syscall", "={ax}," REGS ",~{memory},~{dirflag},~{fpsr},~{flags}", true, true, llvm::InlineAsm::AsmDialect::AD_Intel, false); \
-    auto syscall##N##Result = builder->CreateCall(syscall##N##AsmCall, syscall##N##ArgsValues); \
-    builder->CreateRet(syscall##N##Result); \
+#define CREATE_SYSCALL(N, REGS)                                                                                                                                                                         \
+    {                                                                                                                                                                                                   \
+        auto int64Type = llvm::Type::getInt64Ty(*llvmContext);                                                                                                                                          \
+        std::vector<llvm::Type*> syscall##N##Args {};                                                                                                                                                   \
+        for (uint32_t i = 0; i < N + 1; i++)                                                                                                                                                            \
+            syscall##N##Args.push_back(int64Type);                                                                                                                                                      \
+        auto syscall##N##Type = llvm::FunctionType::get(int64Type, syscall##N##Args, false);                                                                                                            \
+        auto syscall##N = llvm::Function::Create(syscall##N##Type, llvm::Function::LinkageTypes::ExternalLinkage, "syscall" #N, *module);                                                               \
+        std::vector<llvm::Value*> syscall##N##ArgsValues {};                                                                                                                                            \
+        for (auto& arg : syscall##N->args())                                                                                                                                                            \
+            syscall##N##ArgsValues.push_back(&arg);                                                                                                                                                     \
+        auto syscall##N##Block = llvm::BasicBlock::Create(*llvmContext, "entry", syscall##N);                                                                                                           \
+        builder->SetInsertPoint(syscall##N##Block);                                                                                                                                                     \
+        auto syscall##N##AsmCall = llvm::InlineAsm::get(syscall##N##Type, "syscall", "={ax}," REGS ",~{memory},~{dirflag},~{fpsr},~{flags}", true, true, llvm::InlineAsm::AsmDialect::AD_Intel, false); \
+        auto syscall##N##Result = builder->CreateCall(syscall##N##AsmCall, syscall##N##ArgsValues);                                                                                                     \
+        builder->CreateRet(syscall##N##Result);                                                                                                                                                         \
     }
-
 
 Context::Context(const std::string& baseFile)
 {
@@ -125,7 +124,7 @@ std::pair<uint32_t, uint32_t> Context::LineColumnFromLocation(Location location)
 [[noreturn]] void Context::Error(Location location, const char* fmt, ...) const
 {
     auto lineColumn = LineColumnFromLocation(location);
-    fprintf(stderr, "%s:%d:%d ", files.at(location.fileID).filename.c_str(),lineColumn.first, lineColumn.second);
+    fprintf(stderr, "%s:%d:%d ", files.at(location.fileID).filename.c_str(), lineColumn.first, lineColumn.second);
 
     va_list va;
     va_start(va, fmt);

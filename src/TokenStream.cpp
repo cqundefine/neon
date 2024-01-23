@@ -35,15 +35,14 @@ void TokenStream::InsertStream(TokenStream stream)
 void TokenStream::Dump()
 {
     auto currentIndex = m_index;
-    
+
     Token token;
     printf("Dumping token stream:\n");
     do
     {
         token = NextToken();
         printf("%s\n", token.ToString().c_str());
-    }
-    while (token.type != TokenType::Eof);
+    } while (token.type != TokenType::Eof);
 
     m_index = currentIndex;
 }

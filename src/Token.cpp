@@ -1,5 +1,5 @@
-#include <assert.h>
 #include <Token.h>
+#include <assert.h>
 
 std::string TokenTypeToString(TokenType tokenType)
 {
@@ -79,7 +79,7 @@ std::string TokenTypeToString(TokenType tokenType)
 std::string Token::ToString()
 {
     static_assert(static_cast<uint32_t>(TokenType::_TokenTypeCount) == 32, "Not all tokens are handled in Token::ToString()");
-    switch(type)
+    switch (type)
     {
         case TokenType::Number:
             return std::string("Number (`") + std::to_string(intValue) + "`)";
