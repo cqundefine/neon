@@ -46,12 +46,10 @@ void BinaryExpressionAST::Typecheck() const
         StaticRefCast<NumberExpressionAST>(rhs)->AdjustType(StaticRefCast<IntegerType>(lhs->GetType()));
 
     if (*lhs->GetType() != *rhs->GetType())
-        g_context->Error(location, "Wrong binary operation: %s with type %s", lhs->GetType()->Dump().c_str(), rhs->GetType()->Dump().c_str());
+        g_context->Error(location, "Wrong binary operation: %s with type %s", lhs->GetType()->ReadableName().c_str(), rhs->GetType()->ReadableName().c_str());
 
     if (binaryOperation == BinaryOperation::Assignment && lhs->type != ExpressionType::Variable && lhs->type != ExpressionType::ArrayAccess && lhs->type != ExpressionType::Dereference)
         g_context->Error(location, "Can't assign to non-variable expression");
-
-    // FIXME: Check if variable exists in the current scope
 }
 
 void CallExpressionAST::Typecheck() const
@@ -65,19 +63,24 @@ void CallExpressionAST::Typecheck() const
     for (int i = 0; i < args.size(); i++)
     {
         args[i]->Typecheck();
-        if (args[i]->type == ExpressionType::Number)
-        {
-            assert(function.params[i]->type == TypeEnum::Integer);
+
+        if (args[i]->type == ExpressionType::Number && function.params[i]->type == TypeEnum::Integer)
             StaticRefCast<NumberExpressionAST>(args[i])->AdjustType(StaticRefCast<IntegerType>(function.params[i]));
-        }
+
+        if (*args[i]->GetType() != *function.params[i])
+            g_context->Error(location, "Wrong argument type: %s, expected %s", args[i]->GetType()->ReadableName().c_str(), function.params[i]->ReadableName().c_str());
     }
-    // FIXME: Check if args are correct
 }
 
 void CastExpressionAST::Typecheck() const
 {
-    assert(child->type == ExpressionType::StringLiteral);
-    assert(castedTo->type == TypeEnum::Integer && reinterpret_cast<IntegerType*>(castedTo.get())->bits == 64);
+    child->Typecheck();
+
+    if (child->GetType()->type != TypeEnum::Integer && child->GetType()->type != TypeEnum::Pointer)
+        g_context->Error(location, "Can't cast from type %s", child->GetType()->ReadableName().c_str());
+
+    if (castedTo->type != TypeEnum::Integer && castedTo->type != TypeEnum::Pointer)
+        g_context->Error(location, "Can't cast to type %s", castedTo->ReadableName().c_str());
 }
 
 void ArrayAccessExpressionAST::Typecheck() const
@@ -110,7 +113,7 @@ void ReturnStatementAST::Typecheck() const
     {
         value->Typecheck();
 
-        if (value->type == ExpressionType::Number)
+        if (value->type == ExpressionType::Number && returnedType->type == TypeEnum::Integer)
             StaticRefCast<NumberExpressionAST>(value)->AdjustType(StaticRefCast<IntegerType>(returnedType));
 
         if (*value->GetType() != *returnedType)
@@ -156,10 +159,14 @@ void VariableDefinitionAST::Typecheck() const
             assert(type->type == TypeEnum::Integer);
             StaticRefCast<NumberExpressionAST>(initialValue)->AdjustType(StaticRefCast<IntegerType>(type));
         }
+
         initialValue->Typecheck();
+
+        if (*initialValue->GetType() != *type)
+            g_context->Error(location, "Wrong variable type: %s, expected %s", initialValue->GetType()->ReadableName().c_str(), type->ReadableName().c_str());
     }
+
     blockStack.back()[name] = type;
-    // Check if default assignment is correct
 }
 
 void FunctionAST::Typecheck() const

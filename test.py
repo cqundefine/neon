@@ -21,6 +21,7 @@
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+import argparse
 import sys
 import os
 from os import path
@@ -47,9 +48,9 @@ COMPILER_CRASH = f"{ERROR_COLOR}FAILURE (compiler crashed){RESET_COLOR}"
 NON_OPTIMIZED = "non-optimized"
 OPTIMIZED = "optimized"
 
-TESTS_DIR = "./tests/"
+target = "./tests/"
 
-def cmd_run_echoed(cmd, **kwargs):
+def cmd_run(cmd, **kwargs):
     return subprocess.run(cmd, **kwargs)
 
 def read_blob_field(f: BinaryIO, name: bytes) -> bytes:
@@ -86,7 +87,7 @@ class TestCase:
     stdout: bytes
     stderr: bytes
 
-DEFAULT_TEST_CASE=TestCase(builds=True, argv=[], stdin=bytes(), returncode=0, stdout=bytes(), stderr=bytes())
+DEFAULT_TEST_CASE = TestCase(builds=True, argv=[], stdin=bytes(), returncode=0, stdout=bytes(), stderr=bytes())
 
 def load_test_case(file_path: str) -> Optional[TestCase]:
     try:
@@ -104,10 +105,7 @@ def load_test_case(file_path: str) -> Optional[TestCase]:
     except FileNotFoundError:
         return None
 
-def save_test_case(file_path: str,
-                   builds: bool,
-                   argv: List[str], stdin: bytes,
-                   returncode: int, stdout: bytes, stderr: bytes):
+def save_test_case(file_path: str, builds: bool, argv: List[str], stdin: bytes, returncode: int, stdout: bytes, stderr: bytes):
     with open(file_path, "wb") as f:
         write_int_field(f, b"builds", int(builds))
         write_int_field(f, b"argc", len(argv))
@@ -127,22 +125,27 @@ class RunStats:
     failed_files: List[str] = field(default_factory=list)
 
 def run_pass(file_path: str, tc: TestCase, stats: RunStats, compiler_args, pass_type: str):
-    human_test_name = f"`{file_path[len(TESTS_DIR):-len(NEON_EXT)]}`"
+    human_test_name = f"`{file_path[len(target):-len(NEON_EXT)]}`"
 
     print(f"{INFO}: Testing {human_test_name} ({pass_type}): ", end="")
-    compilation = cmd_run_echoed([COMPILER_PATH, *compiler_args, file_path], capture_output=True)
+
+    compilation = cmd_run([COMPILER_PATH, *compiler_args, file_path], capture_output=True)
     if compilation.returncode != 0:
         stats.failed += 1
         if compilation.returncode == -11:
             print(COMPILER_CRASH)
             stats.failed_files.append(f"{human_test_name} ({pass_type}, compiler crash, segfault)")
             return
-        
+        elif compilation.returncode == -6:
+            print(COMPILER_CRASH)
+            stats.failed_files.append(f"{human_test_name} ({pass_type}, compiler crash, aborted)")
+            return
+
         stats.failed_files.append(f"{human_test_name} ({pass_type})")
         print(DOESNT_BUILD)
         return
-    
-    application = cmd_run_echoed([file_path[:-len(NEON_EXT)], *tc.argv], input=tc.stdin, capture_output=True)
+
+    application = cmd_run([file_path[:-len(NEON_EXT)], *tc.argv], input=tc.stdin, capture_output=True)
 
     if application.returncode != tc.returncode:
         print(FAILURE)
@@ -152,25 +155,25 @@ def run_pass(file_path: str, tc: TestCase, stats: RunStats, compiler_args, pass_
         stats.failed_files.append(f"{human_test_name} ({pass_type}, return code)")
         stats.failed += 1
         return
-    
+
     if application.stdout != tc.stdout:
         print(FAILURE)
         print(f"{ERROR}: Unexpected stdout:")
-        print(f"  Expected: {tc.stdout}")
+        print("  Expected: {x!r}".format(x=tc.stdout))
         print(f"  Actual: {application.stdout}")
         stats.failed_files.append(f"{human_test_name} ({pass_type}, stdout)")
         stats.failed += 1
         return
-    
+
     if application.stderr != tc.stderr:
         print(FAILURE)
         print(f"{ERROR}: Unexpected stderr:")
-        print(f"  Expected: {tc.stderr}")
+        print("  Expected: {x!r}".format(x=tc.stderr))
         print(f"  Actual: {application.stderr}")
         stats.failed_files.append(f"{human_test_name} ({pass_type}, stderr)")
         stats.failed += 1
         return
-    
+
     stats.passed += 1
     print(PASS)
 
@@ -178,7 +181,7 @@ def run_test_for_file(file_path: str, stats: RunStats = RunStats()):
     assert path.isfile(file_path)
     assert file_path.endswith(NEON_EXT)
 
-    human_test_name = f"`{file_path[len(TESTS_DIR):-len(NEON_EXT)]}`"
+    human_test_name = f"`{file_path[len(target):-len(NEON_EXT)]}`"
 
     tc_path = file_path[:-len(NEON_EXT)] + ".txt"
     tc = load_test_case(tc_path)
@@ -188,11 +191,11 @@ def run_test_for_file(file_path: str, stats: RunStats = RunStats()):
         stats.ignored_files.append(human_test_name)
         stats.ignored += 1
         return
-    
+
     if not tc.builds:
         # file path without TESTS_DIR and NEON_EXT
         print(f"{INFO}: Testing {human_test_name} expected build fail: ", end="")
-        compilation = cmd_run_echoed([COMPILER_PATH, file_path], capture_output=True)
+        compilation = cmd_run([COMPILER_PATH, file_path], capture_output=True)
         if compilation.returncode == 0:
             stats.failed_files.append(f"{human_test_name} (expected build fail)")
             stats.failed += 1
@@ -202,10 +205,16 @@ def run_test_for_file(file_path: str, stats: RunStats = RunStats()):
             print(PASS)
         return
 
-    
     run_pass(file_path, tc, stats, [], NON_OPTIMIZED)
     run_pass(file_path, tc, stats, ["-O"], OPTIMIZED)
     # FIXME: Test validity of the IR with llc
+
+def run_test_for_subfolder(folder: str, stats: RunStats):
+    for entry in os.scandir(folder):
+        if entry.is_file() and entry.path.endswith(NEON_EXT):
+            run_test_for_file(entry.path, stats)
+        elif entry.is_dir():
+            run_test_for_subfolder(entry.path, stats)
 
 def run_test_for_folder(folder: str):
     stats = RunStats()
@@ -213,6 +222,8 @@ def run_test_for_folder(folder: str):
     for entry in os.scandir(folder):
         if entry.is_file() and entry.path.endswith(NEON_EXT):
             run_test_for_file(entry.path, stats)
+        elif entry.is_dir():
+            run_test_for_subfolder(entry.path, stats)
 
     print()
     print(f"Passed: {OK_COLOR}{stats.passed}{RESET_COLOR}")
@@ -221,7 +232,7 @@ def run_test_for_folder(folder: str):
     print()
 
     if stats.ignored != 0:
-        print(f"Ignored files:")
+        print("Ignored files:")
         for ignored_file in stats.ignored_files:
             print(f"    {ignored_file}")
         if stats.failed != 0:
@@ -242,117 +253,70 @@ def update_input_for_file(file_path: str, argv: List[str]):
 
     stdin = sys.stdin.buffer.read()
 
-    print(f"{INFO} Saving input to %s")
-    save_test_case(tc_path,
-                   tc.builds,
-                   argv, stdin,
-                   tc.returncode, tc.stdout, tc.stderr)
+    print(f"{INFO} Saving input to {tc_path}")
+    save_test_case(tc_path, tc.builds, argv, stdin, tc.returncode, tc.stdout, tc.stderr)
 
 def update_output_for_file(file_path: str):
     tc_path = file_path[:-len(NEON_EXT)] + ".txt"
     tc = load_test_case(tc_path) or DEFAULT_TEST_CASE
 
-    outputcomp = cmd_run_echoed([COMPILER_PATH, file_path], capture_output=True)
-    if outputcomp.returncode == 0:
-        output = cmd_run_echoed([file_path[:-len(NEON_EXT)], *tc.argv], input=tc.stdin, capture_output=True)
-        print(f"{INFO} Saving output to {tc_path}")
-        save_test_case(tc_path,
-                    True,
-                    tc.argv, tc.stdin,
-                    output.returncode, output.stdout, output.stderr)
+    human_test_name = f"`{file_path[len(target):-len(NEON_EXT)]}`"
+
+    compilation = cmd_run([COMPILER_PATH, file_path], capture_output=True)
+
+    if compilation.returncode == 0:
+        output = cmd_run([file_path[:-len(NEON_EXT)], *tc.argv], input=tc.stdin, capture_output=True)
+        print(f"{INFO} Saving output for {human_test_name} to {tc_path}")
+        save_test_case(tc_path, True, tc.argv, tc.stdin, output.returncode, output.stdout, output.stderr)
+    elif compilation.returncode == -11:
+        print(f"{WARNING}: Compiler crashed on {human_test_name} (segfault). Not saving the output.")
+    elif compilation.returncode == -6:
+        print(f"{WARNING}: Compiler crashed on {human_test_name} (aborted). Not saving the output.")
     else:
-        save_test_case(tc_path,
-                    False,
-                    tc.argv, tc.stdin,
-                    tc.returncode, tc.stdout, tc.stderr)
+        print(f"{INFO} Saving output for {human_test_name} to {tc_path}")
+        save_test_case(tc_path, False, tc.argv, tc.stdin, tc.returncode, tc.stdout, tc.stderr)
 
 
 def update_output_for_folder(folder: str):
     for entry in os.scandir(folder):
         if entry.is_file() and entry.path.endswith(NEON_EXT):
             update_output_for_file(entry.path)
+        elif entry.is_dir():
+            update_output_for_folder(entry.path)
 
-def usage(exe_name: str):
-    print("Usage: ./test.py [SUBCOMMAND]")
-    print("  Run or update the tests. The default [SUBCOMMAND] is 'run'.")
-    print()
-    print("  SUBCOMMAND:")
-    print("    run [TARGET]")
-    print("      Run the test on the [TARGET]. The [TARGET] is either a *.ne file or ")
-    print("      folder with *.ne files. The default [TARGET] is './tests/'.")
-    print()
-    print("    update [SUBSUBCOMMAND]")
-    print("      Update the input or output of the tests.")
-    print("      The default [SUBSUBCOMMAND] is 'output'")
-    print()
-    print("      SUBSUBCOMMAND:")
-    print("        input <TARGET>")
-    print("          Update the input of the <TARGET>. The <TARGET> can only be")
-    print("          a *.ne file.")
-    print()
-    print("        output [TARGET]")
-    print("          Update the output of the [TARGET]. The [TARGET] is either a *.ne")
-    print("          file or folder with *.ne files. The default [TARGET] is")
-    print("          './tests/'")
-    print()
-    print("    full (synonyms: all)")
-    print("      Test and type check everything. (Should be run on CI)")
-    print()
-    print("    help")
-    print("      Print this message to stdout and exit with 0 code.")
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description='Run or update the tests.')
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument("-u", "--update", action="store_true", help="update the output of the tests")
+    group.add_argument("--update-input", action="store_true", help="update the input of the tests")
+    parser.add_argument("target", help="target to run the tests on", default="./tests/", nargs='?')
+    args = parser.parse_args()
 
-if __name__ == '__main__':
-    exe_name, *argv = sys.argv
+    target = args.target
 
-    subcommand = "run"
-
-    if len(argv) > 0:
-        subcommand, *argv = argv
-
-    if subcommand == 'update' or subcommand == 'record':
-        subsubcommand = 'output'
-        if len(argv) > 0:
-            subsubcommand, *argv = argv
-
-        if subsubcommand == 'output':
-            target = './tests/'
-
-            if len(argv) > 0:
-                target, *argv = argv
-
-            if path.isdir(target):
-                update_output_for_folder(target)
-            elif path.isfile(target):
-                update_output_for_file(target)
-            else:
-                assert False, 'unreachable'
-        elif subsubcommand == 'input':
-            if len(argv) == 0:
-                usage(exe_name)
-                print("[ERROR] no file is provided for `%s %s` subcommand" % (subcommand, subsubcommand), file=sys.stderr)
-                exit(1)
-            file_path, *argv = argv
-            update_input_for_file(file_path, argv)
-        else:
-            usage(exe_name)
-            print("[ERROR] unknown subcommand `%s %s`. Available commands are `%s input` or `%s output`" % (subcommand, subsubcommand, subcommand, subcommand), file=sys.stderr)
-            exit(1)
-    elif subcommand == 'run' or subcommand == 'test':
-        target = './tests/'
-
-        if len(argv) > 0:
-            target, *argv = argv
-
-        if path.isdir(target):
-            run_test_for_folder(target)
-        elif path.isfile(target):
-            run_test_for_file(target)
-        else:
-            # TODO: `./test.py run non-existing-file` fails with 'unreachable'
-            assert False, 'unreachable'
-    elif subcommand == 'help':
-        usage(exe_name)
-    else:
-        usage(exe_name)
-        print("[ERROR] unknown subcommand `%s`" % subcommand, file=sys.stderr)
+    if not path.exists(target):
+        print(f"{ERROR}: {target} does not exist")
         exit(1)
+
+    if args.update:
+        if path.isdir(target):
+            update_output_for_folder(target)
+        elif path.isfile(target):
+            update_output_for_file(target)
+        else:
+            assert False, 'unreachable'
+        exit(0)
+
+    if args.update_input:
+        if path.isfile(target):
+            update_input_for_file(target, [])
+        else:
+            assert False, 'unreachable'
+        exit(0)
+
+    if path.isdir(target):
+        run_test_for_folder(target)
+    elif path.isfile(target):
+        run_test_for_file(target)
+    else:
+        assert False, 'unreachable'

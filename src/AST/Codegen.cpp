@@ -218,11 +218,11 @@ void IfStatementAST::Codegen() const
     auto conditionFinal = g_context->builder->CreateICmpNE(condition->Codegen(), llvm::ConstantInt::get(*g_context->llvmContext, llvm::APInt(1, 0)), "ifcmpne");
     auto parentFunction = g_context->builder->GetInsertBlock()->getParent();
 
-    auto thenBlock = llvm::BasicBlock::Create(*g_context->llvmContext, "then", parentFunction);
+    auto thenBlock = llvm::BasicBlock::Create(*g_context->llvmContext, "if.then", parentFunction);
     llvm::BasicBlock* elseBlockB;
     if (elseBlock != nullptr)
-        elseBlockB = llvm::BasicBlock::Create(*g_context->llvmContext, "else");
-    auto mergeBlock = llvm::BasicBlock::Create(*g_context->llvmContext, "merge");
+        elseBlockB = llvm::BasicBlock::Create(*g_context->llvmContext, "if.else");
+    auto mergeBlock = llvm::BasicBlock::Create(*g_context->llvmContext, "if.end");
 
     if (elseBlock != nullptr)
         g_context->builder->CreateCondBr(conditionFinal, thenBlock, elseBlockB);
@@ -252,9 +252,9 @@ void WhileStatementAST::Codegen() const
 {
     auto parentFunction = g_context->builder->GetInsertBlock()->getParent();
 
-    auto loopCond = llvm::BasicBlock::Create(*g_context->llvmContext, "loopCond", parentFunction);
-    auto loopBody = llvm::BasicBlock::Create(*g_context->llvmContext, "loopBody");
-    auto loopEnd = llvm::BasicBlock::Create(*g_context->llvmContext, "loopEnd");
+    auto loopCond = llvm::BasicBlock::Create(*g_context->llvmContext, "while.cond", parentFunction);
+    auto loopBody = llvm::BasicBlock::Create(*g_context->llvmContext, "while.body");
+    auto loopEnd = llvm::BasicBlock::Create(*g_context->llvmContext, "while.end");
 
     g_context->builder->CreateBr(loopCond);
 

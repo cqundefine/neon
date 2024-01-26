@@ -25,11 +25,18 @@ struct Type
     virtual std::string Dump() const = 0;
     virtual bool Equals(const Type& other) const = 0;
 
-    bool operator==(const Type& other)
+    virtual std::string ReadableName() const = 0;
+
+    bool operator==(const Type& other) const
     {
         if (other.type != type)
             return false;
         return Equals(other);
+    }
+
+    bool operator!=(const Type& other) const
+    {
+        return !(*this == other);
     }
 };
 
@@ -48,6 +55,8 @@ struct IntegerType : public Type
     virtual llvm::Type* GetType() const override;
     virtual std::string Dump() const override;
     virtual bool Equals(const Type& other) const override;
+
+    virtual std::string ReadableName() const override;
 };
 
 struct StringType : public Type
@@ -60,6 +69,8 @@ struct StringType : public Type
     virtual llvm::Type* GetType() const override;
     virtual std::string Dump() const override;
     virtual bool Equals(const Type& other) const override;
+
+    virtual std::string ReadableName() const override;
 
     llvm::Type* GetUnderlayingType() const;
 };
@@ -79,6 +90,8 @@ struct ArrayType : public Type
     virtual llvm::Type* GetType() const override;
     virtual std::string Dump() const override;
     virtual bool Equals(const Type& other) const override;
+
+    virtual std::string ReadableName() const override;
 };
 
 struct PointerType : public Type
@@ -94,6 +107,8 @@ struct PointerType : public Type
     virtual llvm::Type* GetType() const override;
     virtual std::string Dump() const override;
     virtual bool Equals(const Type& other) const override;
+
+    virtual std::string ReadableName() const override;
 };
 
 struct VoidType : public Type
@@ -106,4 +121,6 @@ struct VoidType : public Type
     virtual llvm::Type* GetType() const override;
     virtual std::string Dump() const override;
     virtual bool Equals(const Type& other) const override;
+
+    virtual std::string ReadableName() const override;
 };

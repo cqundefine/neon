@@ -96,6 +96,35 @@ bool VoidType::Equals(const Type& other) const
 }
 
 // --------------------------
+// ReadableName
+// --------------------------
+
+std::string IntegerType::ReadableName() const
+{
+    return (isSigned ? "int" : "uint") + std::to_string(bits);
+}
+
+std::string StringType::ReadableName() const
+{
+    return "string";
+}
+
+std::string ArrayType::ReadableName() const
+{
+    return arrayType->ReadableName() + "[" + std::to_string(size) + "]";
+}
+
+std::string PointerType::ReadableName() const
+{
+    return underlayingType->ReadableName() + "*";
+}
+
+std::string VoidType::ReadableName() const
+{
+    return "void";
+}
+
+// --------------------------
 // Other
 // --------------------------
 

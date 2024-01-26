@@ -8,8 +8,11 @@ build
 *.s
 output*
 
-tests/*
-!tests/*.ne
-!tests/*.txt
+tests/**/*
+!tests/*/
+!tests/**/*.ne
+!tests/**/*.txt
 
 vscode/*.vsix
+
+.mypy_cache
