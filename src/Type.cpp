@@ -65,8 +65,11 @@ llvm::Type* VoidType::GetType() const
 
 bool IntegerType::Equals(const Type& other) const
 {
-    auto otherInteger = reinterpret_cast<const IntegerType*>(&other);
-    return bits == otherInteger->bits && isSigned == otherInteger->isSigned;
+    // FIXME: Figure out if we should ever compare integer types
+    // for now, just return true
+    return true;
+    // auto otherInteger = reinterpret_cast<const IntegerType*>(&other);
+    // return bits == otherInteger->bits && isSigned == otherInteger->isSigned;
 }
 
 bool StringType::Equals(const Type& other) const

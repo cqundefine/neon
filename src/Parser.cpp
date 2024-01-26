@@ -82,6 +82,12 @@ ExpressionOrStatement Parser::ParseStatement()
     auto token = m_stream.NextToken();
     if (token.type == TokenType::Return)
     {
+        if (m_stream.PeekToken().type == TokenType::Semicolon)
+        {
+            m_stream.NextToken();
+            return MakeRef<ReturnStatementAST>(token.location, nullptr);
+        }
+
         auto value = ParseExpression();
         ExpectToken(TokenType::Semicolon);
         return MakeRef<ReturnStatementAST>(token.location, value);
@@ -90,16 +96,13 @@ ExpressionOrStatement Parser::ParseStatement()
     {
         auto condition = ParseExpression();
         auto block = ParseBlock();
-        auto else_ = m_stream.NextToken();
-        if (else_.type == TokenType::Identifier && else_.stringValue == "else")
+        if (m_stream.PeekToken().type == TokenType::Identifier && m_stream.PeekToken().stringValue == "else")
         {
+            m_stream.NextToken();
             auto elseBlock = ParseBlock();
             return MakeRef<IfStatementAST>(token.location, condition, block, elseBlock);
         }
-        else
-        {
-            m_stream.PreviousToken();
-        }
+
         return MakeRef<IfStatementAST>(token.location, condition, block, nullptr);
     }
     else if (token.type == TokenType::While)

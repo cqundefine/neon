@@ -2,6 +2,8 @@
 
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/LegacyPassManager.h>
+#include <llvm/Passes/PassBuilder.h>
+#include <llvm/Passes/StandardInstrumentations.h>
 #include <llvm/Target/TargetMachine.h>
 
 #include <AST.h>
@@ -12,9 +14,18 @@ struct Context
     Context(const std::string& baseFile);
 
     Own<llvm::LLVMContext> llvmContext;
-    Own<llvm::IRBuilder<>> builder;
     Own<llvm::Module> module;
-    Own<llvm::legacy::FunctionPassManager> functionPassManager;
+
+    Own<llvm::IRBuilder<>> builder;
+
+    Own<llvm::FunctionPassManager> functionPassManager;
+    Own<llvm::LoopAnalysisManager> loopAnalysisManager;
+    Own<llvm::FunctionAnalysisManager> functionAnalysisManager;
+    Own<llvm::CGSCCAnalysisManager> cgsccAnalysisManager;
+    Own<llvm::ModuleAnalysisManager> moduleAnalysisManager;
+    Own<llvm::PassInstrumentationCallbacks> passInstrumentationCallbacks;
+    Own<llvm::StandardInstrumentations> standardInstrumentations;
+
     llvm::TargetMachine* targetMachine;
     llvm::StructType* stringType;
 

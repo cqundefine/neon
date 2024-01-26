@@ -16,15 +16,19 @@ TokenStream CreateTokenStream(uint32_t fileID)
             break;
         }
 
+        bool reachedEndOfLine = false;
         while (file[index] == ' ' || file[index] == '\t' || file[index] == '\n' || file[index] == '\r')
         {
             index++;
             if (index >= file.size())
             {
                 tokens.push_back({ .type = TokenType::Eof });
+                reachedEndOfLine = true;
                 break;
             }
         }
+        if (reachedEndOfLine)
+            break;
 
         if (file[index] == '(')
         {

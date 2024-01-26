@@ -106,8 +106,16 @@ void ReturnStatementAST::Typecheck() const
 {
     returnedType = FindVariable(typecheckCurrentFunction, location);
 
-    // FIXME: Check if correct type is returned
-    value->Typecheck();
+    if (value != nullptr)
+    {
+        value->Typecheck();
+
+        if (value->type == ExpressionType::Number)
+            StaticRefCast<NumberExpressionAST>(value)->AdjustType(StaticRefCast<IntegerType>(returnedType));
+
+        if (*value->GetType() != *returnedType)
+            g_context->Error(location, "Wrong return type: %s, expected %s", value->GetType()->Dump().c_str(), returnedType->Dump().c_str());
+    }
 }
 
 void BlockAST::Typecheck() const

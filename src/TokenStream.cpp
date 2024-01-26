@@ -8,6 +8,14 @@ Token TokenStream::NextToken()
     return m_tokens[m_index++];
 }
 
+Token TokenStream::PeekToken()
+{
+    if (m_index >= m_tokens.size())
+        assert(false && "TokenStream::PeekToken() called after EOF");
+
+    return m_tokens[m_index];
+}
+
 void TokenStream::PreviousToken()
 {
     if (m_index == 0)

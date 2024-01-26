@@ -79,7 +79,8 @@ void ReturnStatementAST::Dump(uint32_t indentCount) const
 {
     INDENT(indentCount);
     puts("ReturnStatement");
-    value->Dump(indentCount + 1);
+    if (value != nullptr)
+        value->Dump(indentCount + 1);
 }
 
 void BlockAST::Dump(uint32_t indentCount) const

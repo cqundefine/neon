@@ -190,7 +190,9 @@ llvm::Value* MemberAccessExpressionAST::Codegen() const
 
 void ReturnStatementAST::Codegen() const
 {
-    if (value->GetType()->type == TypeEnum::Integer)
+    if (!value)
+        g_context->builder->CreateRetVoid();
+    else if (value->GetType()->type == TypeEnum::Integer)
         g_context->builder->CreateRet(g_context->builder->CreateIntCast(value->Codegen(), returnedType->GetType(), StaticRefCast<IntegerType>(returnedType)->isSigned, "bincast"));
     else
         g_context->builder->CreateRet(value->Codegen());
@@ -229,14 +231,17 @@ void IfStatementAST::Codegen() const
 
     g_context->builder->SetInsertPoint(thenBlock);
     block->Codegen();
-    g_context->builder->CreateBr(mergeBlock);
+
+    if (!thenBlock->getTerminator())
+        g_context->builder->CreateBr(mergeBlock);
 
     if (elseBlock != nullptr)
     {
         parentFunction->getBasicBlockList().push_back(elseBlockB);
         g_context->builder->SetInsertPoint(elseBlockB);
         elseBlock->Codegen();
-        g_context->builder->CreateBr(mergeBlock);
+        if (!elseBlockB->getTerminator())
+            g_context->builder->CreateBr(mergeBlock);
     }
 
     parentFunction->getBasicBlockList().push_back(mergeBlock);
@@ -315,7 +320,7 @@ llvm::Function* FunctionAST::Codegen() const
         llvm::verifyFunction(*function);
 
         if (g_context->optimize)
-            g_context->functionPassManager->run(*function);
+            g_context->functionPassManager->run(*function, *g_context->functionAnalysisManager);
 
         blockStack.pop_back();
     }

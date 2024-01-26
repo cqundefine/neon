@@ -4,11 +4,16 @@
 #include <llvm/IR/InlineAsm.h>
 #include <llvm/MC/TargetRegistry.h>
 #include <llvm/Support/FileSystem.h>
+#include <llvm/Support/Host.h>
 #include <llvm/Support/TargetSelect.h>
 #include <llvm/Transforms/InstCombine/InstCombine.h>
 #include <llvm/Transforms/Scalar.h>
+#include <llvm/Transforms/Scalar/DCE.h>
 #include <llvm/Transforms/Scalar/GVN.h>
+#include <llvm/Transforms/Scalar/Reassociate.h>
+#include <llvm/Transforms/Scalar/SimplifyCFG.h>
 #include <llvm/Transforms/Utils.h>
+#include <llvm/Transforms/Utils/Mem2Reg.h>
 #include <stdarg.h>
 #include <sys/prctl.h>
 #include <sys/wait.h>
@@ -42,18 +47,30 @@ Context::Context(const std::string& baseFile)
     llvmContext = MakeOwn<llvm::LLVMContext>();
     module = MakeOwn<llvm::Module>(baseFile, *llvmContext);
     builder = MakeOwn<llvm::IRBuilder<>>(*llvmContext);
-    functionPassManager = MakeOwn<llvm::legacy::FunctionPassManager>(module.get());
 
-    functionPassManager->add(llvm::createPromoteMemoryToRegisterPass());
-    functionPassManager->add(llvm::createInstructionCombiningPass());
-    functionPassManager->add(llvm::createReassociatePass());
-    functionPassManager->add(llvm::createGVNPass());
-    functionPassManager->add(llvm::createCFGSimplificationPass());
+    // Create new pass and analysis managers.
+    functionPassManager = MakeOwn<llvm::FunctionPassManager>();
+    loopAnalysisManager = MakeOwn<llvm::LoopAnalysisManager>();
+    functionAnalysisManager = MakeOwn<llvm::FunctionAnalysisManager>();
+    cgsccAnalysisManager = MakeOwn<llvm::CGSCCAnalysisManager>();
+    moduleAnalysisManager = MakeOwn<llvm::ModuleAnalysisManager>();
+    passInstrumentationCallbacks = MakeOwn<llvm::PassInstrumentationCallbacks>();
+    standardInstrumentations = MakeOwn<llvm::StandardInstrumentations>(true);
+    standardInstrumentations->registerCallbacks(*passInstrumentationCallbacks, functionAnalysisManager.get());
 
-    functionPassManager->doInitialization();
+    functionPassManager->addPass(llvm::PromotePass());
+    functionPassManager->addPass(llvm::DCEPass());
+    functionPassManager->addPass(llvm::InstCombinePass());
+    functionPassManager->addPass(llvm::ReassociatePass());
+    functionPassManager->addPass(llvm::GVNPass());
+    functionPassManager->addPass(llvm::SimplifyCFGPass());
 
-    // FIXME: Unhardcode the target
-    auto targetTriple = "x86_64-pc-linux-gnu";
+    llvm::PassBuilder passBuilder;
+    passBuilder.registerModuleAnalyses(*moduleAnalysisManager);
+    passBuilder.registerFunctionAnalyses(*functionAnalysisManager);
+    passBuilder.crossRegisterProxies(*loopAnalysisManager, *functionAnalysisManager, *cgsccAnalysisManager, *moduleAnalysisManager);
+
+    auto targetTriple = llvm::sys::getDefaultTargetTriple();
 
     llvm::InitializeAllTargetInfos();
     llvm::InitializeAllTargets();
@@ -66,7 +83,7 @@ Context::Context(const std::string& baseFile)
 
     if (!target)
     {
-        fprintf(stderr, "Error loading target %s: %s", targetTriple, error.c_str());
+        fprintf(stderr, "Error loading target %s: %s", targetTriple.c_str(), error.c_str());
         exit(1);
     }
 

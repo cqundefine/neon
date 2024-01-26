@@ -12,6 +12,7 @@ public:
     }
 
     Token NextToken();
+    Token PeekToken();
     void PreviousToken();
 
     void RemoveLastToken();
