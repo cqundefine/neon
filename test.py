@@ -25,14 +25,31 @@ import sys
 import os
 from os import path
 import subprocess
-import shlex
-from typing import List, BinaryIO, Tuple, Optional
+from typing import List, BinaryIO, Optional
 from dataclasses import dataclass, field
 
-NEON_EXT = '.ne'
+COMPILER_PATH = "./build/Neon"
+NEON_EXT = ".ne"
+
+OK_COLOR = "\033[92m"
+WARNING_COLOR = "\033[93m"
+ERROR_COLOR = "\033[91m"
+RESET_COLOR = "\033[0m"
+
+INFO = f"{OK_COLOR}INFO{RESET_COLOR}"
+WARNING = f"{WARNING_COLOR}WARNING{RESET_COLOR}"
+PASS = f"{OK_COLOR}PASS{RESET_COLOR}"
+ERROR = f"{ERROR_COLOR}ERROR{RESET_COLOR}"
+FAILURE = f"{ERROR_COLOR}FAILURE{RESET_COLOR}"
+DOESNT_BUILD = f"{ERROR_COLOR}FAILURE (doesn\'t build){RESET_COLOR}"
+COMPILER_CRASH = f"{ERROR_COLOR}FAILURE (compiler crashed){RESET_COLOR}"
+
+NON_OPTIMIZED = "non-optimized"
+OPTIMIZED = "optimized"
+
+TESTS_DIR = "./tests/"
 
 def cmd_run_echoed(cmd, **kwargs):
-    print("[CMD] %s" % " ".join(map(shlex.quote, cmd)))
     return subprocess.run(cmd, **kwargs)
 
 def read_blob_field(f: BinaryIO, name: bytes) -> bytes:
@@ -75,14 +92,14 @@ def load_test_case(file_path: str) -> Optional[TestCase]:
     try:
         with open(file_path, "rb") as f:
             argv = []
-            builds = bool(read_int_field(f, b'builds'))
-            argc = read_int_field(f, b'argc')
+            builds = bool(read_int_field(f, b"builds"))
+            argc = read_int_field(f, b"argc")
             for index in range(argc):
-                argv.append(read_blob_field(f, b'arg%d' % index).decode('utf-8'))
-            stdin = read_blob_field(f, b'stdin')
-            returncode = read_int_field(f, b'returncode')
-            stdout = read_blob_field(f, b'stdout')
-            stderr = read_blob_field(f, b'stderr')
+                argv.append(read_blob_field(f, b"arg%d" % index).decode("utf-8"))
+            stdin = read_blob_field(f, b"stdin")
+            returncode = read_int_field(f, b"returncode")
+            stdout = read_blob_field(f, b"stdout")
+            stderr = read_blob_field(f, b"stderr")
             return TestCase(builds, argv, stdin, returncode, stdout, stderr)
     except FileNotFoundError:
         return None
@@ -92,92 +109,140 @@ def save_test_case(file_path: str,
                    argv: List[str], stdin: bytes,
                    returncode: int, stdout: bytes, stderr: bytes):
     with open(file_path, "wb") as f:
-        write_int_field(f, b'builds', int(builds))
-        write_int_field(f, b'argc', len(argv))
+        write_int_field(f, b"builds", int(builds))
+        write_int_field(f, b"argc", len(argv))
         for index, arg in enumerate(argv):
-            write_blob_field(f, b'arg%d' % index, arg.encode('utf-8'))
-        write_blob_field(f, b'stdin', stdin)
-        write_int_field(f, b'returncode', returncode)
-        write_blob_field(f, b'stdout', stdout)
-        write_blob_field(f, b'stderr', stderr)
+            write_blob_field(f, b'arg%d' % index, arg.encode("utf-8"))
+        write_blob_field(f, b"stdin", stdin)
+        write_int_field(f, b"returncode", returncode)
+        write_blob_field(f, b"stdout", stdout)
+        write_blob_field(f, b"stderr", stderr)
 
 @dataclass
 class RunStats:
+    passed: int = 0
     failed: int = 0
     ignored: int = 0
+    ignored_files: List[str] = field(default_factory=list)
     failed_files: List[str] = field(default_factory=list)
+
+def run_pass(file_path: str, tc: TestCase, stats: RunStats, compiler_args, pass_type: str):
+    human_test_name = f"`{file_path[len(TESTS_DIR):-len(NEON_EXT)]}`"
+
+    print(f"{INFO}: Testing {human_test_name} ({pass_type}): ", end="")
+    compilation = cmd_run_echoed([COMPILER_PATH, *compiler_args, file_path], capture_output=True)
+    if compilation.returncode != 0:
+        stats.failed += 1
+        if compilation.returncode == -11:
+            print(COMPILER_CRASH)
+            stats.failed_files.append(f"{human_test_name} ({pass_type}, compiler crash, segfault)")
+            return
+        
+        stats.failed_files.append(f"{human_test_name} ({pass_type})")
+        print(DOESNT_BUILD)
+        return
+    
+    application = cmd_run_echoed([file_path[:-len(NEON_EXT)], *tc.argv], input=tc.stdin, capture_output=True)
+
+    if application.returncode != tc.returncode:
+        print(FAILURE)
+        print(f"{ERROR}: Unexpected return code:")
+        print(f"  Expected: {tc.returncode}")
+        print(f"  Actual: {application.returncode}")
+        stats.failed_files.append(f"{human_test_name} ({pass_type}, return code)")
+        stats.failed += 1
+        return
+    
+    if application.stdout != tc.stdout:
+        print(FAILURE)
+        print(f"{ERROR}: Unexpected stdout:")
+        print(f"  Expected: {tc.stdout}")
+        print(f"  Actual: {application.stdout}")
+        stats.failed_files.append(f"{human_test_name} ({pass_type}, stdout)")
+        stats.failed += 1
+        return
+    
+    if application.stderr != tc.stderr:
+        print(FAILURE)
+        print(f"{ERROR}: Unexpected stderr:")
+        print(f"  Expected: {tc.stderr}")
+        print(f"  Actual: {application.stderr}")
+        stats.failed_files.append(f"{human_test_name} ({pass_type}, stderr)")
+        stats.failed += 1
+        return
+    
+    stats.passed += 1
+    print(PASS)
 
 def run_test_for_file(file_path: str, stats: RunStats = RunStats()):
     assert path.isfile(file_path)
     assert file_path.endswith(NEON_EXT)
 
-    print('[INFO] Testing %s' % file_path)
+    human_test_name = f"`{file_path[len(TESTS_DIR):-len(NEON_EXT)]}`"
 
     tc_path = file_path[:-len(NEON_EXT)] + ".txt"
     tc = load_test_case(tc_path)
 
-    error = False
-
-    if tc is not None:
-        comp = cmd_run_echoed(["build/Neon", "-O", file_path])
-        if (comp.returncode != 0 and tc.builds) or (comp.returncode == 0 and not tc.builds):
-            error = True
-            stats.failed += 1
-            print("[ERROR] Unexpected build result")
-            print("  Expected:")
-            print("    builds: %r" % tc.builds)
-            print("  Actual:")
-            print("    builds: %r" % bool(comp.returncode == 0))
-        elif tc.builds:
-            com = cmd_run_echoed([file_path[:-len(NEON_EXT)], *tc.argv], input=tc.stdin, capture_output=True)
-            if com.returncode != tc.returncode or com.stdout != tc.stdout or com.stderr != tc.stderr:
-                print("[ERROR] Unexpected output")
-                print("  Expected:")
-                print("    return code: %s" % tc.returncode)
-                print("    stdout: \n%s" % tc.stdout.decode("utf-8"))
-                print("    stderr: \n%s" % tc.stderr.decode("utf-8"))
-                print("  Actual:")
-                print("    return code: %s" % com.returncode)
-                print("    stdout: \n%s" % com.stdout.decode("utf-8"))
-                print("    stderr: \n%s" % com.stderr.decode("utf-8"))
-                error = True
-                stats.failed += 1
-
-    else:
-        print('[WARNING] Could not find any input/output data for %s. Ignoring testing. Only checking if it compiles.' % file_path)
-        com = cmd_run_echoed(["build/Neon", "-O", file_path])
-        if com.returncode != 0:
-            error = True
-            stats.failed += 1
+    if tc is None:
+        print(f"{WARNING}: Could not find test case data for {human_test_name}. Ignoring testing.")
+        stats.ignored_files.append(human_test_name)
         stats.ignored += 1
+        return
+    
+    if not tc.builds:
+        # file path without TESTS_DIR and NEON_EXT
+        print(f"{INFO}: Testing {human_test_name} expected build fail: ", end="")
+        compilation = cmd_run_echoed([COMPILER_PATH, file_path], capture_output=True)
+        if compilation.returncode == 0:
+            stats.failed_files.append(f"{human_test_name} (expected build fail)")
+            stats.failed += 1
+            print(FAILURE)
+        else:
+            stats.passed += 1
+            print(PASS)
+        return
 
-    if error:
-        stats.failed_files.append(file_path)
+    
+    run_pass(file_path, tc, stats, [], NON_OPTIMIZED)
+    run_pass(file_path, tc, stats, ["-O"], OPTIMIZED)
+    # FIXME: Test validity of the IR with llc
 
 def run_test_for_folder(folder: str):
     stats = RunStats()
+
     for entry in os.scandir(folder):
         if entry.is_file() and entry.path.endswith(NEON_EXT):
             run_test_for_file(entry.path, stats)
+
     print()
-    print("Failed: %d, Ignored: %d" % (stats.failed, stats.ignored))
+    print(f"Passed: {OK_COLOR}{stats.passed}{RESET_COLOR}")
+    print(f"Ignored: {WARNING_COLOR}{stats.ignored}{RESET_COLOR}")
+    print(f"Failed: {ERROR_COLOR}{stats.failed}{RESET_COLOR}")
+    print()
+
+    if stats.ignored != 0:
+        print(f"Ignored files:")
+        for ignored_file in stats.ignored_files:
+            print(f"    {ignored_file}")
+        if stats.failed != 0:
+            print()
+
     if stats.failed != 0:
         print("Failed files:")
-        print()
         for failed_file in stats.failed_files:
-            print(f"{failed_file}")
-        exit(1)
+            print(f"    {failed_file}")
+            exit(1)
 
 def update_input_for_file(file_path: str, argv: List[str]):
     assert file_path.endswith(NEON_EXT)
     tc_path = file_path[:-len(NEON_EXT)] + ".txt"
     tc = load_test_case(tc_path) or DEFAULT_TEST_CASE
 
-    print("[INFO] Provide the stdin for the test case. Press ^D when you are done...")
+    print(f"{INFO} Provide the stdin for the test case. Press ^D when you are done...")
 
     stdin = sys.stdin.buffer.read()
 
-    print("[INFO] Saving input to %s" % tc_path)
+    print(f"{INFO} Saving input to %s")
     save_test_case(tc_path,
                    tc.builds,
                    argv, stdin,
@@ -187,10 +252,10 @@ def update_output_for_file(file_path: str):
     tc_path = file_path[:-len(NEON_EXT)] + ".txt"
     tc = load_test_case(tc_path) or DEFAULT_TEST_CASE
 
-    outputcomp = cmd_run_echoed(["build/Neon", "-O", file_path])
+    outputcomp = cmd_run_echoed([COMPILER_PATH, file_path], capture_output=True)
     if outputcomp.returncode == 0:
         output = cmd_run_echoed([file_path[:-len(NEON_EXT)], *tc.argv], input=tc.stdin, capture_output=True)
-        print("[INFO] Saving output to %s" % tc_path)
+        print(f"{INFO} Saving output to {tc_path}")
         save_test_case(tc_path,
                     True,
                     tc.argv, tc.stdin,
