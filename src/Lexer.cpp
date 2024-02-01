@@ -2,7 +2,7 @@
 
 TokenStream CreateTokenStream(uint32_t fileID)
 {
-    static_assert(static_cast<uint32_t>(TokenType::_TokenTypeCount) == 32, "Not all tokens are handled in Lexer::NextToken()");
+    static_assert(static_cast<uint32_t>(TokenType::_TokenTypeCount) == 33, "Not all tokens are handled in Lexer::NextToken()");
 
     std::vector<Token> tokens;
     size_t index = 0;
@@ -293,6 +293,11 @@ TokenStream CreateTokenStream(uint32_t fileID)
             else if (value == "include")
             {
                 tokens.push_back({ .type = TokenType::Include, .location = { fileID, trueBeginIndex } });
+                continue;
+            }
+            else if (value == "struct")
+            {
+                tokens.push_back({ .type = TokenType::Struct, .location = { fileID, trueBeginIndex } });
                 continue;
             }
             else

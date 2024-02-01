@@ -242,7 +242,7 @@ def run_test_for_folder(folder: str):
         print("Failed files:")
         for failed_file in stats.failed_files:
             print(f"    {failed_file}")
-            exit(1)
+        exit(1)
 
 def update_input_for_file(file_path: str, argv: List[str]):
     assert file_path.endswith(NEON_EXT)

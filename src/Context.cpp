@@ -93,7 +93,6 @@ Context::Context(const std::string& baseFile)
     module->setTargetTriple(targetTriple);
 
     std::vector<llvm::Type*> stringMembers { llvm::Type::getInt8PtrTy(*llvmContext), llvm::Type::getInt64Ty(*llvmContext) };
-    stringType = llvm::StructType::create(*llvmContext, stringMembers, "String");
 
     CREATE_SYSCALL(0, "{ax}");
     CREATE_SYSCALL(1, "{ax},{di}");
@@ -141,7 +140,8 @@ std::pair<uint32_t, uint32_t> Context::LineColumnFromLocation(Location location)
 [[noreturn]] void Context::Error(Location location, const char* fmt, ...) const
 {
     auto lineColumn = LineColumnFromLocation(location);
-    fprintf(stderr, "%s:%d:%d ", files.at(location.fileID).filename.c_str(), lineColumn.first, lineColumn.second);
+    if (location.fileID != UINT32_MAX)
+        fprintf(stderr, "%s:%d:%d ", files.at(location.fileID).filename.c_str(), lineColumn.first, lineColumn.second);
 
     va_list va;
     va_start(va, fmt);

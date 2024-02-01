@@ -1,5 +1,6 @@
 #pragma once
 
+#include <Context.h>
 #include <Enums.h>
 #include <Type.h>
 #include <Utils.h>
@@ -100,7 +101,7 @@ struct StringLiteralAST : public ExpressionAST
     virtual void Dump(uint32_t indentCount) const override;
     virtual llvm::Value* Codegen() const override;
     virtual void Typecheck() const override;
-    virtual inline Ref<Type> GetType() const override { return MakeRef<StringType>(); }
+    virtual inline Ref<Type> GetType() const override { return MakeRef<StructType>("string"); }
 };
 
 struct BinaryExpressionAST : public ExpressionAST
@@ -218,14 +219,8 @@ struct MemberAccessExpressionAST : public ExpressionAST
     virtual void Typecheck() const override;
     virtual inline Ref<Type> GetType() const override
     {
-        // FIXME: String is not the only struct type
-        assert(object->GetType()->type == TypeEnum::String);
-        if (memberName == "data")
-            return MakeRef<PointerType>(MakeRef<IntegerType>(8, true));
-        else if (memberName == "size")
-            return MakeRef<IntegerType>(64, true);
-        else
-            assert(false);
+        assert(object->GetType()->type == TypeEnum::Struct);
+        return g_context->structs.at(StaticRefCast<StructType>(object->GetType())->name).members[memberName];
     }
 };
 
@@ -356,9 +351,26 @@ struct FunctionAST : public AST
     void Typecheck() const;
 };
 
+struct StructDefinitionAST : public AST
+{
+    std::string name;
+
+    inline StructDefinitionAST(Location location, const std::string& name)
+        : AST(location)
+        , name(name)
+    {
+    }
+
+    void Dump(uint32_t indentCount) const;
+    void Codegen() const;
+    void Typecheck() const;
+};
+
+
 struct ParsedFile
 {
     std::vector<Ref<FunctionAST>> functions;
+    std::vector<Ref<StructDefinitionAST>> structs;
 
     inline ParsedFile(const std::vector<Ref<FunctionAST>>& functions)
         : functions(functions)

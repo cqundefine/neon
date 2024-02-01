@@ -1,4 +1,5 @@
 #include <AST.h>
+#include <Context.h>
 #include <llvm/IR/Type.h>
 #include <regex>
 
@@ -138,10 +139,23 @@ void FunctionAST::Dump(uint32_t indentCount) const
         block->Dump(indentCount + 1);
 }
 
+void StructDefinitionAST::Dump(uint32_t indentCount) const
+{
+    INDENT(indentCount);
+    printf("Struct (`%s`)\n", name.c_str());
+    for (const auto& [name, type] : g_context->structs.at(name).members)
+    {
+        INDENT(indentCount + 1);
+        printf("Member (`%s`, %s)\n", name.c_str(), type->Dump().c_str());
+    }
+}
+
 void ParsedFile::Dump(uint32_t indentCount) const
 {
     INDENT(indentCount);
     puts("Parsed File");
     for (const auto& function : functions)
         function->Dump(indentCount + 1);
+    for (const auto& structDef : structs)
+        structDef->Dump(indentCount + 1);
 }

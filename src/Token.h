@@ -41,6 +41,7 @@ enum class TokenType
     Extern,
     While,
     Include,
+    Struct,
 
     _TokenTypeCount
 };

@@ -3,7 +3,7 @@
 
 std::string TokenTypeToString(TokenType tokenType)
 {
-    static_assert(static_cast<uint32_t>(TokenType::_TokenTypeCount) == 32, "Not all tokens are handled in Token::ToString()");
+    static_assert(static_cast<uint32_t>(TokenType::_TokenTypeCount) == 33, "Not all tokens are handled in Token::ToString()");
 
     switch (tokenType)
     {
@@ -71,6 +71,8 @@ std::string TokenTypeToString(TokenType tokenType)
             return "While";
         case TokenType::Include:
             return "Include";
+        case TokenType::Struct:
+            return "Struct";
         default:
             assert(false);
     }
@@ -78,7 +80,7 @@ std::string TokenTypeToString(TokenType tokenType)
 
 std::string Token::ToString()
 {
-    static_assert(static_cast<uint32_t>(TokenType::_TokenTypeCount) == 32, "Not all tokens are handled in Token::ToString()");
+    static_assert(static_cast<uint32_t>(TokenType::_TokenTypeCount) == 33, "Not all tokens are handled in Token::ToString()");
     switch (type)
     {
         case TokenType::Number:
@@ -145,6 +147,8 @@ std::string Token::ToString()
             return "While (`while`)";
         case TokenType::Include:
             return "Include (`include`)";
+        case TokenType::Struct:
+            return "Struct (`struct`)";
         default:
             return "Invalid";
     }
