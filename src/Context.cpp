@@ -92,9 +92,6 @@ Context::Context(const std::string& baseFile)
     module->setDataLayout(targetMachine->createDataLayout());
     module->setTargetTriple(targetTriple);
 
-    std::vector<llvm::Type*> stringMembers { llvm::Type::getInt8Ty(*llvmContext)->getPointerTo(), llvm::Type::getInt64Ty(*llvmContext) };
-    stringType = llvm::StructType::create(*llvmContext, stringMembers, "String");
-
     CREATE_SYSCALL(0, "{ax}");
     CREATE_SYSCALL(1, "{ax},{di}");
     CREATE_SYSCALL(2, "{ax},{di},{si}");
@@ -141,7 +138,8 @@ std::pair<uint32_t, uint32_t> Context::LineColumnFromLocation(Location location)
 [[noreturn]] void Context::Error(Location location, const char* fmt, ...) const
 {
     auto lineColumn = LineColumnFromLocation(location);
-    fprintf(stderr, "%s:%d:%d ", files.at(location.fileID).filename.c_str(), lineColumn.first, lineColumn.second);
+    if (location.fileID != UINT32_MAX)
+        fprintf(stderr, "%s:%d:%d ", files.at(location.fileID).filename.c_str(), lineColumn.first, lineColumn.second);
 
     va_list va;
     va_start(va, fmt);
@@ -157,6 +155,24 @@ std::pair<uint32_t, uint32_t> Context::LineColumnFromLocation(Location location)
 void Context::Write(OutputFileType fileType, bool run) const
 {
     assert(!run || fileType == OutputFileType::Executable);
+
+    bool foundMain = false;
+    for (auto& function : module->functions())
+    {
+        if (function.isDeclaration())
+            continue;
+
+        if (function.getName() == "main")
+        {
+            foundMain = true;
+            break;
+        }
+    }
+
+    if (!foundMain)
+    {
+        g_context->Error(LocationNone, "No main function found");
+    }
 
     auto sourceFilenameWithoutExtension = files.at(0).filename.substr(0, files.at(0).filename.length() - files.at(0).filename.substr(files.at(0).filename.find_last_of('.') + 1).length() - 1);
     auto outputFilename = fileType == OutputFileType::Assembly ? sourceFilenameWithoutExtension + ".asm" : sourceFilenameWithoutExtension + ".o";

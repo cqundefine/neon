@@ -1,5 +1,6 @@
 #pragma once
 
+#include <Context.h>
 #include <Enums.h>
 #include <Type.h>
 #include <Utils.h>
@@ -44,6 +45,7 @@ struct ExpressionAST : public AST
 
     virtual void Dump(uint32_t indentCount) const = 0;
     virtual llvm::Value* Codegen() const = 0;
+    virtual llvm::Value* RawCodegen() const { return Codegen(); }
     virtual void Typecheck() const = 0;
     virtual Ref<Type> GetType() const = 0;
 };
@@ -83,6 +85,7 @@ struct VariableExpressionAST : public ExpressionAST
 
     virtual void Dump(uint32_t indentCount) const override;
     virtual llvm::Value* Codegen() const override;
+    virtual llvm::Value* RawCodegen() const override;
     virtual void Typecheck() const override;
     virtual inline Ref<Type> GetType() const override { return type; }
 };
@@ -100,7 +103,7 @@ struct StringLiteralAST : public ExpressionAST
     virtual void Dump(uint32_t indentCount) const override;
     virtual llvm::Value* Codegen() const override;
     virtual void Typecheck() const override;
-    virtual inline Ref<Type> GetType() const override { return MakeRef<StringType>(); }
+    virtual inline Ref<Type> GetType() const override { return MakeRef<StructType>("string"); }
 };
 
 struct BinaryExpressionAST : public ExpressionAST
@@ -218,14 +221,8 @@ struct MemberAccessExpressionAST : public ExpressionAST
     virtual void Typecheck() const override;
     virtual inline Ref<Type> GetType() const override
     {
-        // FIXME: String is not the only struct type
-        assert(object->GetType()->type == TypeEnum::String);
-        if (memberName == "data")
-            return MakeRef<PointerType>(MakeRef<IntegerType>(8, true));
-        else if (memberName == "size")
-            return MakeRef<IntegerType>(64, true);
-        else
-            assert(false);
+        assert(object->GetType()->type == TypeEnum::Struct);
+        return g_context->structs.at(StaticRefCast<StructType>(object->GetType())->name).members[memberName];
     }
 };
 

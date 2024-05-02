@@ -6,9 +6,9 @@
 enum class TypeEnum
 {
     Integer,
-    String,
     Array,
     Pointer,
+    Struct,
     Void
 };
 
@@ -59,22 +59,6 @@ struct IntegerType : public Type
     virtual std::string ReadableName() const override;
 };
 
-struct StringType : public Type
-{
-    inline StringType()
-        : Type(TypeEnum::String)
-    {
-    }
-
-    virtual llvm::Type* GetType() const override;
-    virtual std::string Dump() const override;
-    virtual bool Equals(const Type& other) const override;
-
-    virtual std::string ReadableName() const override;
-
-    llvm::Type* GetUnderlayingType() const;
-};
-
 struct ArrayType : public Type
 {
     Ref<Type> arrayType;
@@ -109,6 +93,25 @@ struct PointerType : public Type
     virtual bool Equals(const Type& other) const override;
 
     virtual std::string ReadableName() const override;
+};
+
+struct StructType : public Type
+{
+    std::string name;
+
+    inline StructType(const std::string& name)
+        : Type(TypeEnum::Struct)
+        , name(name)
+    {
+    }
+
+    virtual llvm::Type* GetType() const override;
+    virtual std::string Dump() const override;
+    virtual bool Equals(const Type& other) const override;
+
+    virtual std::string ReadableName() const override;
+
+    llvm::Type* GetUnderlayingType() const;
 };
 
 struct VoidType : public Type

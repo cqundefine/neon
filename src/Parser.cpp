@@ -5,6 +5,7 @@
 Ref<ParsedFile> Parser::Parse()
 {
     std::vector<Ref<FunctionAST>> functions;
+
     while (true)
     {
         auto token = m_stream.NextToken();
@@ -13,7 +14,7 @@ Ref<ParsedFile> Parser::Parse()
             if (token.type == TokenType::Extern)
                 ExpectToken(TokenType::Function);
             auto nameToken = m_stream.NextToken();
-            assert(nameToken.type == TokenType::Identifier);
+            ExepctToBe(nameToken, TokenType::Identifier);
             ExpectToken(TokenType::LParen);
 
             std::vector<FunctionAST::Param> params;
@@ -47,6 +48,38 @@ Ref<ParsedFile> Parser::Parse()
                 block = ParseBlock();
             functions.push_back(MakeRef<FunctionAST>(token.location, nameToken.stringValue, params, returnType, block));
         }
+        else if (token.type == TokenType::Struct)
+        {
+            auto nameToken = m_stream.NextToken();
+            if (nameToken.type != TokenType::Identifier)
+                g_context->Error(nameToken.location, "Expected struct name");
+            ExpectToken(TokenType::LCurly);
+
+            std::map<std::string, Ref<Type>> members;
+
+            while (m_stream.PeekToken().type == TokenType::Identifier)
+            {
+                auto name = m_stream.NextToken();
+                ExpectToken(TokenType::Colon);
+                auto type = ParseType();
+
+                members[name.stringValue] = type;
+
+                ExpectToken(TokenType::Semicolon);
+            }
+
+            ExpectToken(TokenType::RCurly);
+
+            std::vector<llvm::Type*> llvmMembers;
+            for (auto& [name, type] : members)
+                llvmMembers.push_back(type->GetType());
+
+            g_context->structs[nameToken.stringValue] = {
+                .name = nameToken.stringValue,
+                .members = members,
+                .llvmType = llvm::StructType::create(llvmMembers, nameToken.stringValue)
+            };
+        }
         else if (token.type == TokenType::Eof)
         {
             break;
@@ -62,7 +95,7 @@ Ref<ParsedFile> Parser::Parse()
 Ref<BlockAST> Parser::ParseBlock()
 {
     auto lcurly = m_stream.NextToken();
-    assert(lcurly.type == TokenType::LCurly);
+    ExepctToBe(lcurly, TokenType::LCurly);
     Token token = m_stream.NextToken();
 
     std::vector<ExpressionOrStatement> statements;
@@ -267,7 +300,7 @@ Ref<ExpressionAST> Parser::ParsePrimary()
     while (token.type == TokenType::Dot)
     {
         auto member = m_stream.NextToken();
-        assert(member.type == TokenType::Identifier);
+        ExepctToBe(member, TokenType::Identifier);
         primary = MakeRef<MemberAccessExpressionAST>(token.location, primary, member.stringValue);
         token = m_stream.NextToken();
     }
@@ -379,7 +412,8 @@ std::pair<BinaryOperation, Location> Parser::ParseOperation()
 Ref<Type> Parser::ParseType(bool allowVoid)
 {
     Token typeToken = m_stream.NextToken();
-    assert(typeToken.type == TokenType::Identifier);
+    ExepctToBe(typeToken, TokenType::Identifier);
+
     Ref<Type> type;
     if (typeToken.stringValue == "int8" || typeToken.stringValue == "uint8")
         type = MakeRef<IntegerType>(8, typeToken.stringValue[0] != 'u');
@@ -389,8 +423,6 @@ Ref<Type> Parser::ParseType(bool allowVoid)
         type = MakeRef<IntegerType>(32, typeToken.stringValue[0] != 'u');
     else if (typeToken.stringValue == "int64" || typeToken.stringValue == "uint64")
         type = MakeRef<IntegerType>(64, typeToken.stringValue[0] != 'u');
-    else if (typeToken.stringValue == "string")
-        type = MakeRef<StringType>();
     else if (typeToken.stringValue == "void")
     {
         if (!allowVoid)
@@ -398,7 +430,7 @@ Ref<Type> Parser::ParseType(bool allowVoid)
         type = MakeRef<VoidType>();
     }
     else
-        g_context->Error(typeToken.location, "Unexpected token: %s", typeToken.ToString().c_str());
+        type = MakeRef<StructType>(typeToken.stringValue);
 
     Token modifier = m_stream.NextToken();
     if (modifier.type == TokenType::Asterisk)
@@ -413,7 +445,7 @@ Ref<Type> Parser::ParseType(bool allowVoid)
     else if (modifier.type == TokenType::LSquareBracket)
     {
         auto size = m_stream.NextToken();
-        assert(size.type == TokenType::Number);
+        ExepctToBe(size, TokenType::Number);
         ExpectToken(TokenType::RSquareBracket);
         return MakeRef<ArrayType>(type, size.intValue);
     }
@@ -429,7 +461,11 @@ void Parser::ExpectToken(TokenType tokenType)
 {
     Token token = m_stream.NextToken();
     if (token.type != tokenType)
-    {
         g_context->Error(token.location, "Unexpected token %s, expected %s", token.ToString().c_str(), TokenTypeToString(tokenType).c_str());
-    }
+}
+
+void Parser::ExepctToBe(Token token, TokenType tokenType)
+{
+    if (token.type != tokenType)
+        g_context->Error(token.location, "Unexpected token %s, expected %s", token.ToString().c_str(), TokenTypeToString(tokenType).c_str());
 }

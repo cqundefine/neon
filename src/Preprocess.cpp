@@ -3,7 +3,19 @@
 
 static std::vector<uint32_t> g_includedFiles;
 
-TokenStream Preprocess(TokenStream stream)
+void IncludeFile(TokenStream& stream, const std::string& file)
+{
+    uint32_t includedID = g_context->LoadFile("lib/" + file + ".ne");
+    if (std::find(g_includedFiles.begin(), g_includedFiles.end(), includedID) != g_includedFiles.end())
+        return;
+    g_includedFiles.push_back(includedID);
+
+    auto includeStream = CreateTokenStream(includedID);
+    auto includePreprocessedStream = Preprocess(includeStream);
+    stream.InsertStream(includePreprocessedStream);
+}
+
+TokenStream PreprocessSubfile(TokenStream stream)
 {
     while (true)
     {
@@ -19,17 +31,16 @@ TokenStream Preprocess(TokenStream stream)
             if (path.type != TokenType::StringLiteral)
                 g_context->Error(path.location, "Expected string literal after include");
 
-            uint32_t includedID = g_context->LoadFile("lib/" + path.stringValue + ".ne");
-            if (std::find(g_includedFiles.begin(), g_includedFiles.end(), includedID) != g_includedFiles.end())
-                continue;
-            g_includedFiles.push_back(includedID);
-
-            auto includeStream = CreateTokenStream(includedID);
-            auto includePreprocessedStream = Preprocess(includeStream);
-            stream.InsertStream(includePreprocessedStream);
+            IncludeFile(stream, path.stringValue);
         }
     }
 
     stream.Reset();
     return std::move(stream);
+}
+
+TokenStream Preprocess(TokenStream stream)
+{
+    IncludeFile(stream, "Prelude");
+    return std::move(PreprocessSubfile(std::move(stream)));
 }

@@ -6,8 +6,9 @@
 #include <llvm/Passes/StandardInstrumentations.h>
 #include <llvm/Target/TargetMachine.h>
 
-#include <AST.h>
+#include <Type.h>
 #include <Utils.h>
+#include <map>
 
 struct Context
 {
@@ -27,7 +28,15 @@ struct Context
     Own<llvm::StandardInstrumentations> standardInstrumentations;
 
     llvm::TargetMachine* targetMachine;
-    llvm::StructType* stringType;
+
+    struct StructInfo
+    {
+        std::string name;
+        std::map<std::string, Ref<Type>> members;
+        llvm::StructType* llvmType;
+    };
+
+    std::map<std::string, StructInfo> structs;
 
     bool optimize;
 

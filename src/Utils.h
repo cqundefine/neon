@@ -19,6 +19,7 @@ constexpr Ref<T> MakeRef(Args&&... args)
 {
     return std::make_shared<T>(std::forward<Args>(args)...);
 }
+
 template <typename T, typename Base>
 constexpr Ref<T> StaticRefCast(const Ref<Base>& base)
 {
@@ -31,10 +32,6 @@ struct Location
     size_t index;
 };
 
-inline std::string ReadFile(const std::string& filename)
-{
-    std::ifstream ifs(filename);
-    std::stringstream fileBuffer;
-    fileBuffer << ifs.rdbuf();
-    return fileBuffer.str();
-}
+constexpr Location LocationNone = { UINT32_MAX, 0 };
+
+std::string ReadFile(const std::string& filename);

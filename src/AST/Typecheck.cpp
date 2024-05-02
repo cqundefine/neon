@@ -48,7 +48,7 @@ void BinaryExpressionAST::Typecheck() const
     if (*lhs->GetType() != *rhs->GetType())
         g_context->Error(location, "Wrong binary operation: %s with type %s", lhs->GetType()->ReadableName().c_str(), rhs->GetType()->ReadableName().c_str());
 
-    if (binaryOperation == BinaryOperation::Assignment && lhs->type != ExpressionType::Variable && lhs->type != ExpressionType::ArrayAccess && lhs->type != ExpressionType::Dereference)
+    if (binaryOperation == BinaryOperation::Assignment && lhs->type != ExpressionType::Variable && lhs->type != ExpressionType::ArrayAccess && lhs->type != ExpressionType::Dereference && lhs->type != ExpressionType::MemberAccess)
         g_context->Error(location, "Can't assign to non-variable expression");
 }
 
@@ -100,9 +100,20 @@ void DereferenceExpressionAST::Typecheck() const
 void MemberAccessExpressionAST::Typecheck() const
 {
     object->Typecheck();
-    // FIXME: Check if struct has that field once we actually support structs
-    if (memberName != "data" && memberName != "size")
-        g_context->Error(location, "Can't access member %s", memberName.c_str());
+
+    if (object->GetType()->type != TypeEnum::Struct)
+        g_context->Error(location, "Can't access member of non-struct type: %s", object->GetType()->ReadableName().c_str());
+
+    auto structType = StaticRefCast<StructType>(object->GetType());
+    for (const auto& [memberName, memberType] : g_context->structs[structType->name].members)
+    {
+        if (memberName == this->memberName)
+        {
+            return;
+        }
+    }
+
+    g_context->Error(location, "Can't access member %s", memberName.c_str());
 }
 
 void ReturnStatementAST::Typecheck() const

@@ -196,13 +196,17 @@ def run_test_for_file(file_path: str, stats: RunStats = RunStats()):
         # file path without TESTS_DIR and NEON_EXT
         print(f"{INFO}: Testing {human_test_name} expected build fail: ", end="")
         compilation = cmd_run([COMPILER_PATH, file_path], capture_output=True)
-        if compilation.returncode == 0:
+        if compilation.returncode == 1:
+            stats.passed += 1
+            print(PASS)
+        elif compilation.returncode == 0:
             stats.failed_files.append(f"{human_test_name} (expected build fail)")
             stats.failed += 1
             print(FAILURE)
         else:
-            stats.passed += 1
-            print(PASS)
+            stats.failed_files.append(f"{human_test_name} (compiler crash)")
+            stats.failed += 1
+            print(COMPILER_CRASH)
         return
 
     run_pass(file_path, tc, stats, [], NON_OPTIMIZED)
