@@ -4,8 +4,8 @@
 #include <llvm/IR/InlineAsm.h>
 #include <llvm/MC/TargetRegistry.h>
 #include <llvm/Support/FileSystem.h>
-#include <llvm/Support/Host.h>
 #include <llvm/Support/TargetSelect.h>
+#include <llvm/TargetParser/Host.h>
 #include <llvm/Transforms/InstCombine/InstCombine.h>
 #include <llvm/Transforms/Scalar.h>
 #include <llvm/Transforms/Scalar/DCE.h>
@@ -55,8 +55,8 @@ Context::Context(const std::string& baseFile)
     cgsccAnalysisManager = MakeOwn<llvm::CGSCCAnalysisManager>();
     moduleAnalysisManager = MakeOwn<llvm::ModuleAnalysisManager>();
     passInstrumentationCallbacks = MakeOwn<llvm::PassInstrumentationCallbacks>();
-    standardInstrumentations = MakeOwn<llvm::StandardInstrumentations>(true);
-    standardInstrumentations->registerCallbacks(*passInstrumentationCallbacks, functionAnalysisManager.get());
+    standardInstrumentations = MakeOwn<llvm::StandardInstrumentations>(*llvmContext, true);
+    standardInstrumentations->registerCallbacks(*passInstrumentationCallbacks, moduleAnalysisManager.get());
 
     functionPassManager->addPass(llvm::PromotePass());
     functionPassManager->addPass(llvm::DCEPass());
@@ -92,7 +92,7 @@ Context::Context(const std::string& baseFile)
     module->setDataLayout(targetMachine->createDataLayout());
     module->setTargetTriple(targetTriple);
 
-    std::vector<llvm::Type*> stringMembers { llvm::Type::getInt8PtrTy(*llvmContext), llvm::Type::getInt64Ty(*llvmContext) };
+    std::vector<llvm::Type*> stringMembers { llvm::Type::getInt8Ty(*llvmContext)->getPointerTo(), llvm::Type::getInt64Ty(*llvmContext) };
     stringType = llvm::StructType::create(*llvmContext, stringMembers, "String");
 
     CREATE_SYSCALL(0, "{ax}");
@@ -172,7 +172,7 @@ void Context::Write(OutputFileType fileType, bool run) const
 
     llvm::legacy::PassManager pass;
 
-    if (g_context->targetMachine->addPassesToEmitFile(pass, outputStream, nullptr, fileType == OutputFileType::Assembly ? llvm::CGFT_AssemblyFile : llvm::CGFT_ObjectFile))
+    if (g_context->targetMachine->addPassesToEmitFile(pass, outputStream, nullptr, fileType == OutputFileType::Assembly ? llvm::CodeGenFileType::AssemblyFile : llvm::CodeGenFileType::ObjectFile))
     {
         fprintf(stderr, "This machine can't emit this file type");
         exit(1);

@@ -171,6 +171,9 @@ void VariableDefinitionAST::Typecheck() const
 
 void FunctionAST::Typecheck() const
 {
+    assert(name != "");
+    assert(returnType);
+
     typecheckCurrentFunction = name;
     blockStack.push_back({});
 
@@ -200,13 +203,13 @@ void ParsedFile::Typecheck() const
     blockStack.push_back({});
 
     auto int64 = MakeRef<IntegerType>(64, false);
-    typecheckFunctions["syscall0"] = { { int64 } };
-    typecheckFunctions["syscall1"] = { { int64, int64 } };
-    typecheckFunctions["syscall2"] = { { int64, int64, int64 } };
-    typecheckFunctions["syscall3"] = { { int64, int64, int64, int64 } };
-    typecheckFunctions["syscall4"] = { { int64, int64, int64, int64, int64 } };
-    typecheckFunctions["syscall5"] = { { int64, int64, int64, int64, int64, int64 } };
-    typecheckFunctions["syscall6"] = { { int64, int64, int64, int64, int64, int64, int64 } };
+    typecheckFunctions["syscall0"] = { .params = { int64 }, .returnType = int64 };
+    typecheckFunctions["syscall1"] = { .params = { int64, int64 }, .returnType = int64 };
+    typecheckFunctions["syscall2"] = { .params = { int64, int64, int64 }, .returnType = int64 };
+    typecheckFunctions["syscall3"] = { .params = { int64, int64, int64, int64 }, .returnType = int64 };
+    typecheckFunctions["syscall4"] = { .params = { int64, int64, int64, int64, int64 }, .returnType = int64 };
+    typecheckFunctions["syscall5"] = { .params = { int64, int64, int64, int64, int64, int64 }, .returnType = int64 };
+    typecheckFunctions["syscall6"] = { .params = { int64, int64, int64, int64, int64, int64, int64 }, .returnType = int64 };
 
     for (const auto& function : functions)
         function->Typecheck();

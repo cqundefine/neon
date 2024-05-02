@@ -39,7 +39,7 @@ llvm::Value* StringLiteralAST::Codegen() const
 
     auto charArray = llvm::ConstantArray::get(llvm::ArrayType::get(llvm::Type::getInt8Ty(*g_context->llvmContext), chars.size()), chars);
     auto rawString = new llvm::GlobalVariable(*g_context->module, charArray->getType(), true, llvm::GlobalValue::PrivateLinkage, charArray);
-    auto stringStruct = llvm::ConstantStruct::get(g_context->stringType, { llvm::ConstantExpr::getBitCast(rawString, llvm::Type::getInt8PtrTy(*g_context->llvmContext)), llvm::ConstantInt::get(*g_context->llvmContext, llvm::APInt(64, value.size())) });
+    auto stringStruct = llvm::ConstantStruct::get(g_context->stringType, { llvm::ConstantExpr::getBitCast(rawString, llvm::Type::getInt8Ty(*g_context->llvmContext)->getPointerTo()), llvm::ConstantInt::get(*g_context->llvmContext, llvm::APInt(64, value.size())) });
 
     llvm::GlobalVariable* globalVariable = new llvm::GlobalVariable(*g_context->module, stringStruct->getType(), true, llvm::GlobalVariable::ExternalLinkage, stringStruct);
     return globalVariable;
@@ -139,6 +139,12 @@ llvm::Value* CallExpressionAST::Codegen() const
     for (const auto& arg : args)
         codegennedArgs.push_back(arg->Codegen());
 
+    if (returnedType->type == TypeEnum::Void)
+    {
+        g_context->builder->CreateCall(function, codegennedArgs);
+        return nullptr;
+    }
+
     return g_context->builder->CreateCall(function, codegennedArgs, "call");
 }
 
@@ -146,7 +152,14 @@ llvm::Value* CastExpressionAST::Codegen() const
 {
     assert(castedTo->type == TypeEnum::Integer);
     auto numberType = reinterpret_cast<IntegerType*>(castedTo.get());
-    return g_context->builder->CreateIntCast(child->Codegen(), numberType->GetType(), numberType->isSigned, "cast");
+    if (child->GetType()->type == TypeEnum::Integer && castedTo->type == TypeEnum::Integer)
+        return g_context->builder->CreateIntCast(child->Codegen(), numberType->GetType(), StaticRefCast<IntegerType>(child->GetType())->isSigned, "intcast");
+    else if (child->GetType()->type == TypeEnum::Integer && castedTo->type == TypeEnum::Pointer)
+        return g_context->builder->CreateIntToPtr(child->Codegen(), numberType->GetType(), "inttoptr");
+    else if (child->GetType()->type == TypeEnum::Pointer && castedTo->type == TypeEnum::Integer)
+        return g_context->builder->CreatePtrToInt(child->Codegen(), numberType->GetType(), "ptrtoint");
+    else
+        assert(false);
 }
 
 llvm::Value* ArrayAccessExpressionAST::Codegen() const
@@ -168,7 +181,7 @@ llvm::Value* MemberAccessExpressionAST::Codegen() const
 
     // FIXME: Unhardcode this when we have proper struct types
     auto elementIndex = memberName == "size" ? 1 : 0;
-    auto elementType = memberName == "size" ? (llvm::Type*)llvm::Type::getInt64Ty(*g_context->llvmContext) : (llvm::Type*)llvm::Type::getInt8PtrTy(*g_context->llvmContext);
+    auto elementType = memberName == "size" ? (llvm::Type*)llvm::Type::getInt64Ty(*g_context->llvmContext) : (llvm::Type*)llvm::Type::getInt8Ty(*g_context->llvmContext)->getPointerTo();
 
     if (object->type == ExpressionType::StringLiteral)
     {
@@ -237,14 +250,14 @@ void IfStatementAST::Codegen() const
 
     if (elseBlock != nullptr)
     {
-        parentFunction->getBasicBlockList().push_back(elseBlockB);
+        parentFunction->insert(parentFunction->end(), elseBlockB);
         g_context->builder->SetInsertPoint(elseBlockB);
         elseBlock->Codegen();
         if (!elseBlockB->getTerminator())
             g_context->builder->CreateBr(mergeBlock);
     }
 
-    parentFunction->getBasicBlockList().push_back(mergeBlock);
+    parentFunction->insert(parentFunction->end(), mergeBlock);
     g_context->builder->SetInsertPoint(mergeBlock);
 }
 
@@ -263,13 +276,13 @@ void WhileStatementAST::Codegen() const
     auto conditionFinal = g_context->builder->CreateICmpNE(condition->Codegen(), llvm::ConstantInt::get(*g_context->llvmContext, llvm::APInt(1, 0)), "whilecmpne");
     g_context->builder->CreateCondBr(conditionFinal, loopBody, loopEnd);
 
-    parentFunction->getBasicBlockList().push_back(loopBody);
+    parentFunction->insert(parentFunction->end(), loopBody);
     g_context->builder->SetInsertPoint(loopBody);
 
     block->Codegen();
     g_context->builder->CreateBr(loopCond);
 
-    parentFunction->getBasicBlockList().push_back(loopEnd);
+    parentFunction->insert(parentFunction->end(), loopEnd);
     g_context->builder->SetInsertPoint(loopEnd);
 }
 
