@@ -1,0 +1,4 @@
+function notMain(): int32
+{
+    
+}

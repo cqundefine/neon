@@ -155,11 +155,15 @@ ExpressionOrStatement Parser::ParseStatement()
             {
                 return MakeRef<VariableDefinitionAST>(token.location, token.stringValue, type, nullptr);
             }
-            else
+            else if (equalsOrSemicolon.type == TokenType::Equals)
             {
                 auto initialValue = ParseExpression();
                 ExpectToken(TokenType::Semicolon);
                 return MakeRef<VariableDefinitionAST>(token.location, token.stringValue, type, initialValue);
+            }
+            else
+            {
+                g_context->Error(equalsOrSemicolon.location, "Unexpected token: %s", equalsOrSemicolon.ToString().c_str());
             }
         }
         else
@@ -322,16 +326,19 @@ Ref<ExpressionAST> Parser::ParseBarePrimary()
         if (second.type == TokenType::LParen)
         {
             std::vector<Ref<ExpressionAST>> args;
-            Token arg = m_stream.NextToken();
-            while (arg.type != TokenType::RParen)
+            while (m_stream.PeekToken().type != TokenType::RParen)
             {
-                if (arg.type != TokenType::Comma)
+                args.push_back(ParseExpression());
+                if (m_stream.PeekToken().type == TokenType::Comma)
                 {
-                    m_stream.PreviousToken();
-                    args.push_back(ParseExpression());
+                    m_stream.NextToken();
                 }
-                arg = m_stream.NextToken();
+                else if (m_stream.PeekToken().type != TokenType::RParen)
+                {
+                    g_context->Error(m_stream.PeekToken().location, "Expected comma or right parenthesis");
+                }
             }
+            m_stream.NextToken();
             return MakeRef<CallExpressionAST>(first.location, first.stringValue, args);
         }
         else if (second.type == TokenType::LessThan)
@@ -349,7 +356,8 @@ Ref<ExpressionAST> Parser::ParseBarePrimary()
             if (second.type == TokenType::LSquareBracket)
             {
                 auto index = ParsePrimary();
-                assert(index->type == ExpressionType::Number);
+                if (index->type != ExpressionType::Number)
+                    g_context->Error(index->location, "Array index must be a number");
                 ExpectToken(TokenType::RSquareBracket);
                 return MakeRef<ArrayAccessExpressionAST>(second.location, var, std::static_pointer_cast<NumberExpressionAST>(index));
             }

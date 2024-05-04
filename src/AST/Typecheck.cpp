@@ -54,12 +54,16 @@ void BinaryExpressionAST::Typecheck() const
 
 void CallExpressionAST::Typecheck() const
 {
-    assert(typecheckFunctions.count(calleeName));
+    if (typecheckFunctions.find(calleeName) == typecheckFunctions.end())
+        g_context->Error(location, "Can't find function: %s", calleeName.c_str());
+
     auto function = typecheckFunctions[calleeName];
 
     returnedType = function.returnType;
 
-    assert(function.params.size() == args.size());
+    if (function.params.size() != args.size())
+        g_context->Error(location, "Wrong number of arguments: %d, expected %d", args.size(), function.params.size());
+
     for (int i = 0; i < args.size(); i++)
     {
         args[i]->Typecheck();
@@ -163,18 +167,25 @@ void WhileStatementAST::Typecheck() const
 
 void VariableDefinitionAST::Typecheck() const
 {
+    if (type->type == TypeEnum::Struct)
+    {
+        auto structType = StaticRefCast<StructType>(type);
+        if (g_context->structs.find(structType->name) == g_context->structs.end())
+            g_context->Error(location, "Can't find struct: %s", structType->name.c_str());
+    }
+
     if (initialValue != nullptr)
     {
+        initialValue->Typecheck();
+
+        if (*initialValue->GetType() != *type)
+            g_context->Error(location, "Wrong variable type: %s, expected %s", initialValue->GetType()->ReadableName().c_str(), type->ReadableName().c_str());
+
         if (initialValue->type == ExpressionType::Number)
         {
             assert(type->type == TypeEnum::Integer);
             StaticRefCast<NumberExpressionAST>(initialValue)->AdjustType(StaticRefCast<IntegerType>(type));
         }
-
-        initialValue->Typecheck();
-
-        if (*initialValue->GetType() != *type)
-            g_context->Error(location, "Wrong variable type: %s, expected %s", initialValue->GetType()->ReadableName().c_str(), type->ReadableName().c_str());
     }
 
     blockStack.back()[name] = type;
@@ -194,7 +205,22 @@ void FunctionAST::Typecheck() const
     for (const auto& param : params)
     {
         typecheckParams.push_back(param.type);
+
+        if (param.type->type == TypeEnum::Struct)
+        {
+            auto structType = StaticRefCast<StructType>(param.type);
+            if (g_context->structs.find(structType->name) == g_context->structs.end())
+                g_context->Error(location, "Can't find struct: %s", structType->name.c_str());
+        }
+
         blockStack.back()[param.name] = param.type;
+    }
+
+    if (returnType->type == TypeEnum::Struct)
+    {
+        auto structType = StaticRefCast<StructType>(returnType);
+        if (g_context->structs.find(structType->name) == g_context->structs.end())
+            g_context->Error(location, "Can't find struct: %s", structType->name.c_str());
     }
 
     typecheckFunctions[name] = {
@@ -203,7 +229,24 @@ void FunctionAST::Typecheck() const
     };
 
     if (block != nullptr)
+    {
         block->Typecheck();
+
+        // TODO: This is not an ideal solution, but it works for now
+        if (returnType->type != TypeEnum::Void)
+        {
+            if (block->statements.size() == 0)
+                g_context->Error(location, "Function must have a return statement");
+
+            auto lastStatement = block->statements[block->statements.size() - 1];
+            if (!std::holds_alternative<Ref<StatementAST>>(lastStatement))
+                g_context->Error(location, "Last statement must be a return statement");
+            
+            if (std::get<Ref<StatementAST>>(lastStatement)->type != StatementType::Return)
+                g_context->Error(location, "Last statement must be a return statement");
+        }
+    }
+
 
     blockStack.pop_back();
     typecheckCurrentFunction = "";

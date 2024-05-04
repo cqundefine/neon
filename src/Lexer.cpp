@@ -102,14 +102,14 @@ TokenStream CreateTokenStream(uint32_t fileID)
             if (file[index] == '/')
             {
                 index++;
-                while (file[index] != '\n')
+                while (file[index] != '\n' && file[index] != '\r' && index < file.size())
                     index++;
                 continue;
             }
             else if (file[index] == '*')
             {
                 index++;
-                while (!(file[index] == '*' && file[index + 1] == '/'))
+                while (!(file[index] == '*' && file[index + 1] == '/') && index + 1 < file.size())
                     index++;
                 index += 2;
                 continue;
@@ -183,8 +183,11 @@ TokenStream CreateTokenStream(uint32_t fileID)
             uint32_t trueBeginIndex = index;
             std::string value;
             index++;
-            do
+            while (file[index] != '"')
             {
+                if (index >= file.size())
+                    g_context->Error({ fileID, index }, "Unexpected end of file");
+
                 char c = file[index];
                 if (c == '\\')
                 {
@@ -207,7 +210,7 @@ TokenStream CreateTokenStream(uint32_t fileID)
                     value += c;
                 }
                 index++;
-            } while (file[index] != '"');
+            }
             index++;
 
             tokens.push_back({ .type = TokenType::StringLiteral,

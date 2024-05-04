@@ -1,0 +1,10 @@
+:i builds 1
+:i argc 0
+:b stdin 0
+
+:i returncode 0
+:b stdout 24
+This should get printed
+
+:b stderr 0
+

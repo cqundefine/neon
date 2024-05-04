@@ -116,6 +116,8 @@ uint32_t Context::LoadFile(const std::string& filename)
 
 std::pair<uint32_t, uint32_t> Context::LineColumnFromLocation(Location location) const
 {
+    assert(location.fileID != UINT32_MAX);
+
     uint32_t line = 1;
     uint32_t column = 1;
 
@@ -137,9 +139,11 @@ std::pair<uint32_t, uint32_t> Context::LineColumnFromLocation(Location location)
 
 [[noreturn]] void Context::Error(Location location, const char* fmt, ...) const
 {
-    auto lineColumn = LineColumnFromLocation(location);
     if (location.fileID != UINT32_MAX)
+    {
+        auto lineColumn = LineColumnFromLocation(location);
         fprintf(stderr, "%s:%d:%d ", files.at(location.fileID).filename.c_str(), lineColumn.first, lineColumn.second);
+    }
 
     va_list va;
     va_start(va, fmt);

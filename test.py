@@ -193,7 +193,6 @@ def run_test_for_file(file_path: str, stats: RunStats = RunStats()):
         return
 
     if not tc.builds:
-        # file path without TESTS_DIR and NEON_EXT
         print(f"{INFO}: Testing {human_test_name} expected build fail: ", end="")
         compilation = cmd_run([COMPILER_PATH, file_path], capture_output=True)
         if compilation.returncode == 1:
@@ -211,7 +210,7 @@ def run_test_for_file(file_path: str, stats: RunStats = RunStats()):
 
     run_pass(file_path, tc, stats, [], NON_OPTIMIZED)
     run_pass(file_path, tc, stats, ["-O"], OPTIMIZED)
-    # FIXME: Test validity of the IR with llc
+    # TODO: Test validity of the IR with llc
 
 def run_test_for_subfolder(folder: str, stats: RunStats):
     for entry in os.scandir(folder):

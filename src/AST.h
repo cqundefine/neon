@@ -23,6 +23,15 @@ enum class ExpressionType
     MemberAccess
 };
 
+enum class StatementType
+{
+    Return,
+    Block,
+    If,
+    While,
+    VariableDefinition
+};
+
 struct AST
 {
     Location location;
@@ -44,7 +53,7 @@ struct ExpressionAST : public AST
     }
 
     virtual void Dump(uint32_t indentCount) const = 0;
-    virtual llvm::Value* Codegen() const = 0;
+    virtual llvm::Value* Codegen(bool usedAsStatement = false) const = 0;
     virtual llvm::Value* RawCodegen() const { return Codegen(); }
     virtual void Typecheck() const = 0;
     virtual Ref<Type> GetType() const = 0;
@@ -65,7 +74,7 @@ struct NumberExpressionAST : public ExpressionAST
     void AdjustType(Ref<IntegerType> type);
 
     virtual void Dump(uint32_t indentCount) const override;
-    virtual llvm::Value* Codegen() const override;
+    virtual llvm::Value* Codegen(bool usedAsStatement = false) const override;
     virtual void Typecheck() const override;
     virtual inline Ref<Type> GetType() const override { return type; }
 };
@@ -84,7 +93,7 @@ struct VariableExpressionAST : public ExpressionAST
     }
 
     virtual void Dump(uint32_t indentCount) const override;
-    virtual llvm::Value* Codegen() const override;
+    virtual llvm::Value* Codegen(bool usedAsStatement = false) const override;
     virtual llvm::Value* RawCodegen() const override;
     virtual void Typecheck() const override;
     virtual inline Ref<Type> GetType() const override { return type; }
@@ -101,7 +110,7 @@ struct StringLiteralAST : public ExpressionAST
     }
 
     virtual void Dump(uint32_t indentCount) const override;
-    virtual llvm::Value* Codegen() const override;
+    virtual llvm::Value* Codegen(bool usedAsStatement = false) const override;
     virtual void Typecheck() const override;
     virtual inline Ref<Type> GetType() const override { return MakeRef<StructType>("string"); }
 };
@@ -121,7 +130,7 @@ struct BinaryExpressionAST : public ExpressionAST
     }
 
     virtual void Dump(uint32_t indentCount) const override;
-    virtual llvm::Value* Codegen() const override;
+    virtual llvm::Value* Codegen(bool usedAsStatement = false) const override;
     virtual void Typecheck() const override;
     virtual inline Ref<Type> GetType() const override { return lhs->GetType(); }
 };
@@ -142,7 +151,7 @@ struct CallExpressionAST : public ExpressionAST
     }
 
     virtual void Dump(uint32_t indentCount) const override;
-    virtual llvm::Value* Codegen() const override;
+    virtual llvm::Value* Codegen(bool usedAsStatement = false) const override;
     virtual void Typecheck() const override;
     virtual inline Ref<Type> GetType() const override { return returnedType; }
 };
@@ -160,7 +169,7 @@ struct CastExpressionAST : public ExpressionAST
     }
 
     virtual void Dump(uint32_t indentCount) const override;
-    virtual llvm::Value* Codegen() const override;
+    virtual llvm::Value* Codegen(bool usedAsStatement = false) const override;
     virtual void Typecheck() const override;
     virtual inline Ref<Type> GetType() const override { return castedTo; }
 };
@@ -178,7 +187,7 @@ struct ArrayAccessExpressionAST : public ExpressionAST
     }
 
     virtual void Dump(uint32_t indentCount) const override;
-    virtual llvm::Value* Codegen() const override;
+    virtual llvm::Value* Codegen(bool usedAsStatement = false) const override;
     virtual void Typecheck() const override;
     virtual inline Ref<Type> GetType() const override { return StaticRefCast<ArrayType>(array->type)->arrayType; }
 };
@@ -194,7 +203,7 @@ struct DereferenceExpressionAST : public ExpressionAST
     }
 
     virtual void Dump(uint32_t indentCount) const override;
-    virtual llvm::Value* Codegen() const override;
+    virtual llvm::Value* Codegen(bool usedAsStatement = false) const override;
     virtual void Typecheck() const override;
     virtual inline Ref<Type> GetType() const override
     {
@@ -217,7 +226,7 @@ struct MemberAccessExpressionAST : public ExpressionAST
     }
 
     virtual void Dump(uint32_t indentCount) const override;
-    virtual llvm::Value* Codegen() const override;
+    virtual llvm::Value* Codegen(bool usedAsStatement = false) const override;
     virtual void Typecheck() const override;
     virtual inline Ref<Type> GetType() const override
     {
@@ -228,8 +237,11 @@ struct MemberAccessExpressionAST : public ExpressionAST
 
 struct StatementAST : public AST
 {
-    inline StatementAST(Location location)
+    StatementType type;
+
+    inline StatementAST(Location location, StatementType type)
         : AST(location)
+        , type(type)
     {
     }
 
@@ -246,7 +258,7 @@ struct ReturnStatementAST : public StatementAST
     mutable Ref<Type> returnedType;
 
     inline ReturnStatementAST(Location location, Ref<ExpressionAST> value)
-        : StatementAST(location)
+        : StatementAST(location, StatementType::Return)
         , value(value)
     {
     }
@@ -278,7 +290,7 @@ struct IfStatementAST : public StatementAST
     Ref<BlockAST> elseBlock;
 
     inline IfStatementAST(Location location, Ref<ExpressionAST> condition, Ref<BlockAST> block, Ref<BlockAST> elseBlock)
-        : StatementAST(location)
+        : StatementAST(location, StatementType::If)
         , condition(condition)
         , block(block)
         , elseBlock(elseBlock)
@@ -296,7 +308,7 @@ struct WhileStatementAST : public StatementAST
     Ref<BlockAST> block;
 
     inline WhileStatementAST(Location location, Ref<ExpressionAST> condition, Ref<BlockAST> block)
-        : StatementAST(location)
+        : StatementAST(location, StatementType::While)
         , condition(condition)
         , block(block)
     {
@@ -314,7 +326,7 @@ struct VariableDefinitionAST : public StatementAST
     Ref<ExpressionAST> initialValue;
 
     inline VariableDefinitionAST(Location location, const std::string& name, Ref<Type> type, Ref<ExpressionAST> initialValue)
-        : StatementAST(location)
+        : StatementAST(location, StatementType::VariableDefinition)
         , name(name)
         , type(type)
         , initialValue(initialValue)

@@ -20,12 +20,12 @@ static std::vector<std::map<std::string, llvm::AllocaInst*>> blockStack;
     g_context->Error(location, "Can't find variable: %s", name.c_str());
 }
 
-llvm::Value* NumberExpressionAST::Codegen() const
+llvm::Value* NumberExpressionAST::Codegen(bool) const
 {
     return llvm::ConstantInt::get(*g_context->llvmContext, llvm::APInt(type->bits, value, type->isSigned));
 }
 
-llvm::Value* VariableExpressionAST::Codegen() const
+llvm::Value* VariableExpressionAST::Codegen(bool) const
 {
     auto alloca = FindVariable(name, location);
     return g_context->builder->CreateLoad(alloca->getAllocatedType(), alloca, name);
@@ -38,7 +38,7 @@ llvm::Value* VariableExpressionAST::RawCodegen() const
     return Codegen();
 }
 
-llvm::Value* StringLiteralAST::Codegen() const
+llvm::Value* StringLiteralAST::Codegen(bool) const
 {
     // FIXME: Use createGlobalStringPtr
     std::vector<llvm::Constant*> chars(value.size());
@@ -53,12 +53,13 @@ llvm::Value* StringLiteralAST::Codegen() const
     return globalVariable;
 }
 
-llvm::Value* BinaryExpressionAST::Codegen() const
+llvm::Value* BinaryExpressionAST::Codegen(bool usedAsStatement) const
 {
     static_assert(static_cast<uint32_t>(BinaryOperation::_BinaryOperationCount) == 11, "Not all binary operations are handled in BinaryExpressionAST::Codegen()");
 
     if (binaryOperation == BinaryOperation::Assignment)
     {
+        // FIXME: This needs a rafactor
         if (lhs->type == ExpressionType::Variable)
         {
             auto variableLHS = StaticRefCast<VariableExpressionAST>(lhs);
@@ -118,8 +119,9 @@ llvm::Value* BinaryExpressionAST::Codegen() const
         {
             assert(false);
         }
-        return nullptr;
-        // return lhs->Codegen();
+        if (usedAsStatement)
+            return nullptr;
+        return lhs->Codegen();
     }
     else if (lhs->GetType()->type == TypeEnum::Integer && rhs->GetType()->type == TypeEnum::Integer)
     {
@@ -177,7 +179,7 @@ llvm::Value* BinaryExpressionAST::Codegen() const
     }
 }
 
-llvm::Value* CallExpressionAST::Codegen() const
+llvm::Value* CallExpressionAST::Codegen(bool) const
 {
     auto function = g_context->module->getFunction(calleeName);
     assert(function);
@@ -195,7 +197,7 @@ llvm::Value* CallExpressionAST::Codegen() const
     return g_context->builder->CreateCall(function, codegennedArgs, "call");
 }
 
-llvm::Value* CastExpressionAST::Codegen() const
+llvm::Value* CastExpressionAST::Codegen(bool) const
 {
     assert(castedTo->type == TypeEnum::Integer);
     auto numberType = reinterpret_cast<IntegerType*>(castedTo.get());
@@ -209,19 +211,19 @@ llvm::Value* CastExpressionAST::Codegen() const
         assert(false);
 }
 
-llvm::Value* ArrayAccessExpressionAST::Codegen() const
+llvm::Value* ArrayAccessExpressionAST::Codegen(bool) const
 {
     auto alloca = FindVariable(array->name, location);
     auto gep = g_context->builder->CreateGEP(alloca->getAllocatedType(), alloca, index->Codegen(), "gep");
     return g_context->builder->CreateLoad(StaticRefCast<ArrayType>(array->GetType())->arrayType->GetType(), gep, array->name);
 }
 
-llvm::Value* DereferenceExpressionAST::Codegen() const
+llvm::Value* DereferenceExpressionAST::Codegen(bool) const
 {
     return g_context->builder->CreateLoad(StaticRefCast<PointerType>(pointer->GetType())->underlayingType->GetType(), pointer->Codegen(), pointer->name);
 }
 
-llvm::Value* MemberAccessExpressionAST::Codegen() const
+llvm::Value* MemberAccessExpressionAST::Codegen(bool) const
 {
     assert(object->GetType()->type == TypeEnum::Struct);
     auto structType = StaticRefCast<StructType>(object->GetType());
@@ -284,7 +286,7 @@ void BlockAST::Codegen() const
         if (std::holds_alternative<Ref<StatementAST>>(statement))
             std::get<Ref<StatementAST>>(statement)->Codegen();
         else
-            std::get<Ref<ExpressionAST>>(statement)->Codegen();
+            std::get<Ref<ExpressionAST>>(statement)->Codegen(true);
     }
 
     blockStack.pop_back();
@@ -292,7 +294,12 @@ void BlockAST::Codegen() const
 
 void IfStatementAST::Codegen() const
 {
-    auto conditionFinal = g_context->builder->CreateICmpNE(condition->Codegen(), llvm::ConstantInt::get(*g_context->llvmContext, llvm::APInt(1, 0)), "ifcmpne");
+    auto conditionCodegenned = condition->Codegen();
+    if (conditionCodegenned->getType()->getTypeID() != llvm::Type::TypeID::IntegerTyID)
+        g_context->Error(condition->location, "Condition must be an integer, this is probably a typechecker bug");
+    auto bits = conditionCodegenned->getType()->getIntegerBitWidth();
+    auto conditionFinal = g_context->builder->CreateICmpNE(conditionCodegenned, llvm::ConstantInt::get(*g_context->llvmContext, llvm::APInt(bits, 0)), "whilecmpne");
+    
     auto parentFunction = g_context->builder->GetInsertBlock()->getParent();
 
     auto thenBlock = llvm::BasicBlock::Create(*g_context->llvmContext, "if.then", parentFunction);
@@ -337,7 +344,11 @@ void WhileStatementAST::Codegen() const
 
     g_context->builder->SetInsertPoint(loopCond);
 
-    auto conditionFinal = g_context->builder->CreateICmpNE(condition->Codegen(), llvm::ConstantInt::get(*g_context->llvmContext, llvm::APInt(1, 0)), "whilecmpne");
+    auto conditionCodegenned = condition->Codegen();
+    if (conditionCodegenned->getType()->getTypeID() != llvm::Type::TypeID::IntegerTyID)
+        g_context->Error(condition->location, "Condition must be an integer, this is probably a typechecker bug");
+    auto bits = conditionCodegenned->getType()->getIntegerBitWidth();
+    auto conditionFinal = g_context->builder->CreateICmpNE(conditionCodegenned, llvm::ConstantInt::get(*g_context->llvmContext, llvm::APInt(bits, 0)), "whilecmpne");
     g_context->builder->CreateCondBr(conditionFinal, loopBody, loopEnd);
 
     parentFunction->insert(parentFunction->end(), loopBody);
