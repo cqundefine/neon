@@ -5,6 +5,7 @@
 Ref<ParsedFile> Parser::Parse()
 {
     std::vector<Ref<FunctionAST>> functions;
+    std::vector<Ref<VariableDefinitionAST>> globalVariables;
 
     while (true)
     {
@@ -91,6 +92,11 @@ Ref<ParsedFile> Parser::Parse()
                 .llvmType = llvm::StructType::create(llvmMembers, nameToken.stringValue)
             };
         }
+        else if (token.type == TokenType::Var || token.type == TokenType::Const)
+        {
+            m_stream.PreviousToken();
+            globalVariables.push_back(ParseVariableDefinition());
+        }
         else if (token.type == TokenType::Eof)
         {
             break;
@@ -100,7 +106,7 @@ Ref<ParsedFile> Parser::Parse()
             g_context->Error(token.location, "Unexpected token: %s", token.ToString().c_str());
         }
     }
-    return MakeRef<ParsedFile>(functions);
+    return MakeRef<ParsedFile>(functions, globalVariables);
 }
 
 Ref<BlockAST> Parser::ParseBlock()
@@ -157,24 +163,8 @@ ExpressionOrStatement Parser::ParseStatement()
     }
     else if (token.type == TokenType::Var || token.type == TokenType::Const)
     {
-        Token name = m_stream.NextToken();
-        ExpectToken(TokenType::Colon);
-        auto type = ParseType();
-        auto equalsOrSemicolon = m_stream.NextToken();
-        if (equalsOrSemicolon.type == TokenType::Semicolon)
-        {
-            return MakeRef<VariableDefinitionAST>(token.location, name.stringValue, type, token.type == TokenType::Const, nullptr);
-        }
-        else if (equalsOrSemicolon.type == TokenType::Equals)
-        {
-            auto initialValue = ParseExpression();
-            ExpectToken(TokenType::Semicolon);
-            return MakeRef<VariableDefinitionAST>(token.location, name.stringValue, type, token.type == TokenType::Const, initialValue);
-        }
-        else
-        {
-            g_context->Error(equalsOrSemicolon.location, "Unexpected token: %s", equalsOrSemicolon.ToString().c_str());
-        }
+        m_stream.PreviousToken();
+        return ParseVariableDefinition();
     }
     else
     {
@@ -182,6 +172,29 @@ ExpressionOrStatement Parser::ParseStatement()
         auto expression = ParseExpression();
         ExpectToken(TokenType::Semicolon);
         return expression;
+    }
+}
+
+Ref<VariableDefinitionAST> Parser::ParseVariableDefinition()
+{
+    Token declaration = m_stream.NextToken();
+    Token name = m_stream.NextToken();
+    ExpectToken(TokenType::Colon);
+    auto type = ParseType();
+    auto equalsOrSemicolon = m_stream.NextToken();
+    if (equalsOrSemicolon.type == TokenType::Semicolon)
+    {
+        return MakeRef<VariableDefinitionAST>(declaration.location, name.stringValue, type, declaration.type == TokenType::Const, nullptr);
+    }
+    else if (equalsOrSemicolon.type == TokenType::Equals)
+    {
+        auto initialValue = ParseExpression();
+        ExpectToken(TokenType::Semicolon);
+        return MakeRef<VariableDefinitionAST>(declaration.location, name.stringValue, type, declaration.type == TokenType::Const, initialValue);
+    }
+    else
+    {
+        g_context->Error(equalsOrSemicolon.location, "Unexpected token: %s", equalsOrSemicolon.ToString().c_str());
     }
 }
 

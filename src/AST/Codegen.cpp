@@ -6,8 +6,65 @@
 #include <llvm/IR/LegacyPassManager.h>
 #include <llvm/IR/Verifier.h>
 
-static std::vector<std::map<std::string, llvm::AllocaInst*>> blockStack;
-[[nodiscard]] static llvm::AllocaInst* FindVariable(const std::string& name, Location location)
+struct VariableInfo
+{
+    virtual llvm::Value* GetValue() const = 0;
+    virtual llvm::Type* GetType() const = 0;
+    virtual bool IsConst() const = 0;
+};
+
+struct VariableInfoAlloca : public VariableInfo
+{
+    llvm::AllocaInst* alloc;
+
+    VariableInfoAlloca(llvm::AllocaInst* alloc)
+        : alloc(alloc)
+    {
+    }
+
+    virtual llvm::Value* GetValue() const override
+    {
+        return alloc;
+    }
+
+    virtual llvm::Type* GetType() const override
+    {
+        return alloc->getAllocatedType();
+    }
+
+    virtual bool IsConst() const override
+    {
+        return false;
+    }
+};
+
+struct VariableInfoGlobal : public VariableInfo
+{
+    llvm::GlobalVariable* global;
+
+    VariableInfoGlobal(llvm::GlobalVariable* global)
+        : global(global)
+    {
+    }
+
+    virtual llvm::Value* GetValue() const override
+    {
+        return global;
+    }
+
+    virtual llvm::Type* GetType() const override
+    {
+        return global->getValueType();
+    }
+
+    virtual bool IsConst() const override
+    {
+        return global->isConstant();
+    }
+};
+
+static std::vector<std::map<std::string, Ref<VariableInfo>>> blockStack;
+[[nodiscard]] static Ref<VariableInfo> FindVariable(const std::string& name, Location location)
 {
     for (int i = blockStack.size() - 1; i >= 0; i--)
     {
@@ -20,37 +77,30 @@ static std::vector<std::map<std::string, llvm::AllocaInst*>> blockStack;
     exit(1);
 }
 
+static bool isInsideFunction = false;
+
 llvm::Value* NumberExpressionAST::Codegen(bool) const
 {
-    return llvm::ConstantInt::get(*g_context->llvmContext, llvm::APInt(type->bits, value, type->isSigned));
+    return EvaluateAsConstant();
 }
 
 llvm::Value* VariableExpressionAST::Codegen(bool) const
 {
-    auto alloca = FindVariable(name, location);
-    return g_context->builder->CreateLoad(alloca->getAllocatedType(), alloca, name);
+    auto var = FindVariable(name, location);
+    return g_context->builder->CreateLoad(var->GetType(), var->GetValue(), name);
 }
 
 llvm::Value* VariableExpressionAST::RawCodegen() const
 {
     if (type->type == TypeEnum::Struct)
-        return FindVariable(name, location);
+        return FindVariable(name, location)->GetValue();
     return Codegen();
 }
 
 llvm::Value* StringLiteralAST::Codegen(bool) const
 {
-    // FIXME: Use createGlobalStringPtr
-    std::vector<llvm::Constant*> chars(value.size());
-    for (uint8_t i = 0; i < value.size(); i++)
-        chars[i] = llvm::ConstantInt::get(*g_context->llvmContext, llvm::APInt(8, value[i], true));
-
-    auto charArray = llvm::ConstantArray::get(llvm::ArrayType::get(llvm::Type::getInt8Ty(*g_context->llvmContext), chars.size()), chars);
-    auto rawString = new llvm::GlobalVariable(*g_context->module, charArray->getType(), true, llvm::GlobalValue::PrivateLinkage, charArray);
-    auto stringStruct = llvm::ConstantStruct::get(g_context->structs.at("string").llvmType, { llvm::ConstantExpr::getBitCast(rawString, llvm::Type::getInt8Ty(*g_context->llvmContext)->getPointerTo()), llvm::ConstantInt::get(*g_context->llvmContext, llvm::APInt(64, value.size())) });
-
-    llvm::GlobalVariable* globalVariable = new llvm::GlobalVariable(*g_context->module, stringStruct->getType(), true, llvm::GlobalVariable::ExternalLinkage, stringStruct);
-    return globalVariable;
+    auto value = EvaluateAsConstant();
+    return new llvm::GlobalVariable(*g_context->module, value->getType(), true, llvm::GlobalVariable::ExternalLinkage, value);
 }
 
 llvm::Value* BinaryExpressionAST::Codegen(bool usedAsStatement) const
@@ -63,12 +113,13 @@ llvm::Value* BinaryExpressionAST::Codegen(bool usedAsStatement) const
         if (lhs->type == ExpressionType::Variable)
         {
             auto variableLHS = StaticRefCast<VariableExpressionAST>(lhs);
-            g_context->builder->CreateStore(rhs->Codegen(), FindVariable(variableLHS->name, variableLHS->location));
+            g_context->builder->CreateStore(rhs->Codegen(), FindVariable(variableLHS->name, variableLHS->location)->GetValue());
         }
         else if (lhs->type == ExpressionType::ArrayAccess)
         {
             auto arrayLHS = StaticRefCast<ArrayAccessExpressionAST>(lhs);
-            auto gep = g_context->builder->CreateGEP(FindVariable(arrayLHS->array->name, arrayLHS->array->location)->getAllocatedType(), FindVariable(arrayLHS->array->name, location), arrayLHS->index->Codegen(), "gep");
+            auto var = FindVariable(arrayLHS->array->name, arrayLHS->array->location);
+            auto gep = g_context->builder->CreateGEP(var->GetType(), var->GetValue(), arrayLHS->index->Codegen(), "gep");
             g_context->builder->CreateStore(rhs->Codegen(), gep);
         }
         else if (lhs->type == ExpressionType::Dereference)
@@ -93,15 +144,15 @@ llvm::Value* BinaryExpressionAST::Codegen(bool usedAsStatement) const
 
             if (memberAccessLHS->object->type == ExpressionType::Variable)
             {
-                auto alloca = FindVariable(StaticRefCast<VariableExpressionAST>(memberAccessLHS->object)->name, memberAccessLHS->object->location);
-                if (alloca->getAllocatedType()->getTypeID() == llvm::Type::TypeID::StructTyID)
+                auto var = FindVariable(StaticRefCast<VariableExpressionAST>(memberAccessLHS->object)->name, memberAccessLHS->object->location);
+                if (var->GetType()->getTypeID() == llvm::Type::TypeID::StructTyID)
                 {
-                    auto gep = g_context->builder->CreateStructGEP(structType->GetUnderlayingType(), alloca, elementIndex, "gep");
+                    auto gep = g_context->builder->CreateStructGEP(structType->GetUnderlayingType(), var->GetValue(), elementIndex, "gep");
                     g_context->builder->CreateStore(rhs->Codegen(), gep);
                 }
-                else if (alloca->getAllocatedType()->getTypeID() == llvm::Type::TypeID::PointerTyID)
+                else if (var->GetType()->getTypeID() == llvm::Type::TypeID::PointerTyID)
                 {
-                    auto load = g_context->builder->CreateLoad(alloca->getAllocatedType(), alloca, "load");
+                    auto load = g_context->builder->CreateLoad(var->GetType(), var->GetValue(), "load");
                     auto gep = g_context->builder->CreateStructGEP(structType->GetUnderlayingType(), load, elementIndex, "gep");
                     g_context->builder->CreateStore(rhs->Codegen(), gep);
                 }
@@ -218,8 +269,8 @@ llvm::Value* CastExpressionAST::Codegen(bool) const
 
 llvm::Value* ArrayAccessExpressionAST::Codegen(bool) const
 {
-    auto alloca = FindVariable(array->name, location);
-    auto gep = g_context->builder->CreateGEP(alloca->getAllocatedType(), alloca, index->Codegen(), "gep");
+    auto var = FindVariable(array->name, location);
+    auto gep = g_context->builder->CreateGEP(var->GetType(), var->GetValue(), index->Codegen(), "gep");
     return g_context->builder->CreateLoad(StaticRefCast<ArrayType>(array->GetType())->arrayType->GetType(), gep, array->name);
 }
 
@@ -249,15 +300,15 @@ llvm::Value* MemberAccessExpressionAST::Codegen(bool) const
     }
     else if (object->type == ExpressionType::Variable)
     {
-        auto alloca = FindVariable(StaticRefCast<VariableExpressionAST>(object)->name, location);
-        if (alloca->getAllocatedType()->getTypeID() == llvm::Type::TypeID::StructTyID)
+        auto var = FindVariable(StaticRefCast<VariableExpressionAST>(object)->name, location);
+        if (var->GetType()->getTypeID() == llvm::Type::TypeID::StructTyID)
         {
-            auto gep = g_context->builder->CreateStructGEP(structType->GetUnderlayingType(), alloca, elementIndex, "gep");
+            auto gep = g_context->builder->CreateStructGEP(structType->GetUnderlayingType(), var->GetValue(), elementIndex, "gep");
             return g_context->builder->CreateLoad(elementType, gep, memberName);
         }
-        else if (alloca->getAllocatedType()->getTypeID() == llvm::Type::TypeID::PointerTyID)
+        else if (var->GetType()->getTypeID() == llvm::Type::TypeID::PointerTyID)
         {
-            auto load = g_context->builder->CreateLoad(alloca->getAllocatedType(), alloca, "load");
+            auto load = g_context->builder->CreateLoad(var->GetType(), var->GetValue(), "load");
             auto gep = g_context->builder->CreateStructGEP(structType->GetUnderlayingType(), load, elementIndex, "gep");
             return g_context->builder->CreateLoad(elementType, gep, memberName);
         }
@@ -368,21 +419,35 @@ void WhileStatementAST::Codegen() const
 
 void VariableDefinitionAST::Codegen() const
 {
-    auto parentFunction = g_context->builder->GetInsertBlock()->getParent();
-    llvm::IRBuilder<> functionBeginBuilder(&parentFunction->getEntryBlock(), parentFunction->getEntryBlock().begin());
-    auto size = type->type == TypeEnum::Array ? llvm::ConstantInt::get(*g_context->llvmContext, llvm::APInt(64, StaticRefCast<ArrayType>(type)->size)) : nullptr;
+    if (isInsideFunction)
+    {
+        // FIXME: Do something about local constants
+        auto parentFunction = g_context->builder->GetInsertBlock()->getParent();
+        llvm::IRBuilder<> functionBeginBuilder(&parentFunction->getEntryBlock(), parentFunction->getEntryBlock().begin());
+        auto size = type->type == TypeEnum::Array ? llvm::ConstantInt::get(*g_context->llvmContext, llvm::APInt(64, StaticRefCast<ArrayType>(type)->size)) : nullptr;
 
-    if (type->type == TypeEnum::Struct)
-        blockStack.back()[name] = functionBeginBuilder.CreateAlloca(StaticRefCast<StructType>(type)->GetUnderlayingType(), size, name);
+        if (type->type == TypeEnum::Struct)
+            blockStack.back()[name] = MakeRef<VariableInfoAlloca>(functionBeginBuilder.CreateAlloca(StaticRefCast<StructType>(type)->GetUnderlayingType(), size, name));
+        else
+            blockStack.back()[name] = MakeRef<VariableInfoAlloca>(functionBeginBuilder.CreateAlloca(type->GetType(), size, name));
+
+        if (initialValue != nullptr)
+            g_context->builder->CreateStore(initialValue->Codegen(), FindVariable(name, location)->GetValue());
+    }
     else
-        blockStack.back()[name] = functionBeginBuilder.CreateAlloca(type->GetType(), size, name);
-
-    if (initialValue != nullptr)
-        g_context->builder->CreateStore(initialValue->Codegen(), FindVariable(name, location));
+    {
+        assert(initialValue);
+        auto global = new llvm::GlobalVariable(*g_context->module, type->GetType(), isConst, llvm::GlobalValue::ExternalLinkage, initialValue->EvaluateAsConstant(), name);
+        blockStack.back()[name] = MakeRef<VariableInfoGlobal>(global);
+    }
 }
 
 llvm::Function* FunctionAST::Codegen() const
 {
+    assert(!isInsideFunction);
+
+    isInsideFunction = true;
+
     std::vector<llvm::Type*> llvmParams;
     for (const auto& param : params)
         llvmParams.push_back(param.type->GetType());
@@ -404,7 +469,7 @@ llvm::Function* FunctionAST::Codegen() const
         {
             // FIXME: Array support
             auto alloca = g_context->builder->CreateAlloca(arg.getType(), 0, arg.getName());
-            blockStack.back()[arg.getName().str()] = alloca;
+            blockStack.back()[arg.getName().str()] = MakeRef<VariableInfoAlloca>(alloca);
             g_context->builder->CreateStore(&arg, alloca);
         }
 
@@ -421,12 +486,17 @@ llvm::Function* FunctionAST::Codegen() const
         blockStack.pop_back();
     }
 
+    isInsideFunction = false;
+
     return function;
 }
 
 void ParsedFile::Codegen() const
 {
     blockStack.push_back({});
+
+    for (const auto& variable : globalVariables)
+        variable->Codegen();
 
     for (const auto& function : functions)
         function->Codegen();
@@ -436,4 +506,5 @@ void ParsedFile::Codegen() const
     blockStack.pop_back();
 
     assert(blockStack.size() == 0);
+    assert(!isInsideFunction);
 }

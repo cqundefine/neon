@@ -18,6 +18,7 @@ public:
 private:
     Ref<BlockAST> ParseBlock();
     ExpressionOrStatement ParseStatement();
+    Ref<VariableDefinitionAST> ParseVariableDefinition();
     Ref<ExpressionAST> ParseExpression();
     Ref<ExpressionAST> ParsePrimary();
     Ref<ExpressionAST> ParseBarePrimary();

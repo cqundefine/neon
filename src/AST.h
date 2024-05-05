@@ -4,6 +4,7 @@
 #include <Enums.h>
 #include <Type.h>
 #include <Utils.h>
+#include <llvm/IR/Constant.h>
 #include <llvm/IR/Value.h>
 #include <variant>
 
@@ -57,6 +58,7 @@ struct ExpressionAST : public AST
     virtual llvm::Value* RawCodegen() const { return Codegen(); }
     virtual void Typecheck() const = 0;
     virtual Ref<Type> GetType() const = 0;
+    virtual llvm::Constant* EvaluateAsConstant() const { g_context->Error(location, "Expression is not constant"); }
 };
 
 struct NumberExpressionAST : public ExpressionAST
@@ -77,6 +79,7 @@ struct NumberExpressionAST : public ExpressionAST
     virtual llvm::Value* Codegen(bool usedAsStatement = false) const override;
     virtual void Typecheck() const override;
     virtual inline Ref<Type> GetType() const override { return type; }
+    virtual llvm::Constant* EvaluateAsConstant() const override;
 };
 
 struct VariableExpressionAST : public ExpressionAST
@@ -113,6 +116,7 @@ struct StringLiteralAST : public ExpressionAST
     virtual llvm::Value* Codegen(bool usedAsStatement = false) const override;
     virtual void Typecheck() const override;
     virtual inline Ref<Type> GetType() const override { return MakeRef<StructType>("string"); }
+    virtual llvm::Constant* EvaluateAsConstant() const override;
 };
 
 struct BinaryExpressionAST : public ExpressionAST
@@ -370,9 +374,11 @@ struct FunctionAST : public AST
 struct ParsedFile
 {
     std::vector<Ref<FunctionAST>> functions;
+    std::vector<Ref<VariableDefinitionAST>> globalVariables;
 
-    inline ParsedFile(const std::vector<Ref<FunctionAST>>& functions)
+    inline ParsedFile(const std::vector<Ref<FunctionAST>>& functions, const std::vector<Ref<VariableDefinitionAST>>& globalVariables)
         : functions(functions)
+        , globalVariables(globalVariables)
     {
     }
 

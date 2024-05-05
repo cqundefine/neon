@@ -275,6 +275,9 @@ void ParsedFile::Typecheck() const
     typecheckFunctions["syscall5"] = { .params = { int64, int64, int64, int64, int64, int64 }, .returnType = int64 };
     typecheckFunctions["syscall6"] = { .params = { int64, int64, int64, int64, int64, int64, int64 }, .returnType = int64 };
 
+    for (const auto& variable : globalVariables)
+        variable->Typecheck();
+
     for (const auto& function : functions)
         function->Typecheck();
 

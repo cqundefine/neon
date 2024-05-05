@@ -144,4 +144,6 @@ void ParsedFile::Dump(uint32_t indentCount) const
     puts("Parsed File");
     for (const auto& function : functions)
         function->Dump(indentCount + 1);
+    for (const auto& variable : globalVariables)
+        variable->Dump(indentCount + 1);
 }
