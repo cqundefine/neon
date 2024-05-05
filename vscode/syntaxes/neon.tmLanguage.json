@@ -25,7 +25,7 @@
 				},
 				{
 					"name": "keyword.neon",
-					"match": "\\b(function|to|struct|extern)\\b"
+					"match": "\\b(function|to|struct|extern|var|const)\\b"
 				},
 				{
 					"name": "support.type",
