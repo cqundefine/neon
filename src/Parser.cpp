@@ -72,7 +72,15 @@ Ref<ParsedFile> Parser::Parse()
 
             std::vector<llvm::Type*> llvmMembers;
             for (auto& [name, type] : members)
+            {
+                if (type->type == TypeEnum::Struct)
+                {
+                    auto structType = StaticRefCast<StructType>(type);
+                    if (g_context->structs.find(structType->name) == g_context->structs.end())
+                        g_context->Error(nameToken.location, "Can't find struct: %s", structType->name.c_str());
+                }
                 llvmMembers.push_back(type->GetType());
+            }
 
             g_context->structs[nameToken.stringValue] = {
                 .name = nameToken.stringValue,
