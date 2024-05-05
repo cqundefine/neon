@@ -46,6 +46,7 @@ enum class TokenType
     Var,
     Const,
     Endif,
+    To,
 
     _TokenTypeCount
 };

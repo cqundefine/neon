@@ -3,7 +3,7 @@
 
 std::string TokenTypeToString(TokenType tokenType)
 {
-    static_assert(static_cast<uint32_t>(TokenType::_TokenTypeCount) == 37, "Not all tokens are handled in Token::ToString()");
+    static_assert(static_cast<uint32_t>(TokenType::_TokenTypeCount) == 38, "Not all tokens are handled in Token::ToString()");
 
     switch (tokenType)
     {
@@ -81,6 +81,8 @@ std::string TokenTypeToString(TokenType tokenType)
             return "Const";
         case TokenType::Endif:
             return "Endif";
+        case TokenType::To:
+            return "To";
         default:
             assert(false);
     }
@@ -88,7 +90,7 @@ std::string TokenTypeToString(TokenType tokenType)
 
 std::string Token::ToString()
 {
-    static_assert(static_cast<uint32_t>(TokenType::_TokenTypeCount) == 37, "Not all tokens are handled in Token::ToString()");
+    static_assert(static_cast<uint32_t>(TokenType::_TokenTypeCount) == 38, "Not all tokens are handled in Token::ToString()");
     switch (type)
     {
         case TokenType::Number:
@@ -165,6 +167,8 @@ std::string Token::ToString()
             return "Const (`const`)";
         case TokenType::Endif:
             return "Endif (`endif`)";
+        case TokenType::To:
+            return "To (`to`)";
         default:
             return "Invalid";
     }

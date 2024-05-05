@@ -2,7 +2,7 @@
 
 TokenStream CreateTokenStream(uint32_t fileID)
 {
-    static_assert(static_cast<uint32_t>(TokenType::_TokenTypeCount) == 37, "Not all tokens are handled in Lexer::NextToken()");
+    static_assert(static_cast<uint32_t>(TokenType::_TokenTypeCount) == 38, "Not all tokens are handled in Lexer::NextToken()");
 
     std::vector<Token> tokens;
     size_t index = 0;
@@ -322,6 +322,11 @@ TokenStream CreateTokenStream(uint32_t fileID)
             else if (value == "endif")
             {
                 tokens.push_back({ .type = TokenType::Endif, .location = { fileID, trueBeginIndex } });
+                continue;
+            }
+            else if (value == "to")
+            {
+                tokens.push_back({ .type = TokenType::To, .location = { fileID, trueBeginIndex } });
                 continue;
             }
             else

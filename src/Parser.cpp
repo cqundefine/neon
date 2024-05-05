@@ -331,15 +331,6 @@ Ref<ExpressionAST> Parser::ParseBarePrimary()
             m_stream.NextToken();
             return MakeRef<CallExpressionAST>(first.location, first.stringValue, args);
         }
-        else if (second.type == TokenType::LessThan)
-        {
-            auto type = ParseType();
-            ExpectToken(TokenType::GreaterThan);
-            ExpectToken(TokenType::LParen);
-            auto child = ParseExpression();
-            ExpectToken(TokenType::RParen);
-            return MakeRef<CastExpressionAST>(first.location, type, child);
-        }
         else
         {
             auto var = MakeRef<VariableExpressionAST>(first.location, first.stringValue);
@@ -365,6 +356,16 @@ Ref<ExpressionAST> Parser::ParseBarePrimary()
         if (child->type != ExpressionType::Variable)
             g_context->Error(first.location, "Can't dereference this expression");
         return MakeRef<DereferenceExpressionAST>(first.location, StaticRefCast<VariableExpressionAST>(child));
+    }
+    else if (first.type == TokenType::To)
+    {
+        ExpectToken(TokenType::LessThan);
+        auto type = ParseType();
+        ExpectToken(TokenType::GreaterThan);
+        ExpectToken(TokenType::LParen);
+        auto child = ParseExpression();
+        ExpectToken(TokenType::RParen);
+        return MakeRef<CastExpressionAST>(first.location, type, child);
     }
     else
     {
