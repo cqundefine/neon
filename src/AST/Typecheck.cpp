@@ -194,7 +194,6 @@ void VariableDefinitionAST::Typecheck() const
 
         if (initialValue->type == ExpressionType::Number)
         {
-            assert(type->type == TypeEnum::Integer);
             StaticRefCast<NumberExpressionAST>(initialValue)->AdjustType(StaticRefCast<IntegerType>(type));
         }
     }

@@ -185,8 +185,13 @@ llvm::Value* CallExpressionAST::Codegen(bool) const
     assert(function);
 
     std::vector<llvm::Value*> codegennedArgs;
-    for (const auto& arg : args)
-        codegennedArgs.push_back(arg->RawCodegen());
+    for (const auto& arg : function->args())
+    {
+        auto codegennedArg = args[arg.getArgNo()]->RawCodegen();
+        if (codegennedArg->getType()->getTypeID() == llvm::Type::TypeID::IntegerTyID && arg.getType()->getTypeID() == llvm::Type::TypeID::IntegerTyID)
+            codegennedArg = g_context->builder->CreateIntCast(codegennedArg, arg.getType(), StaticRefCast<IntegerType>(args[arg.getArgNo()]->GetType())->isSigned, "intcast");
+        codegennedArgs.push_back(codegennedArg);
+    }
 
     if (returnedType->type == TypeEnum::Void)
     {
