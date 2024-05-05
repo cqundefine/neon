@@ -14,7 +14,7 @@ Ref<ParsedFile> Parser::Parse()
             if (token.type == TokenType::Extern)
                 ExpectToken(TokenType::Function);
             auto nameToken = m_stream.NextToken();
-            ExepctToBe(nameToken, TokenType::Identifier);
+            ExpectToBe(nameToken, TokenType::Identifier);
             ExpectToken(TokenType::LParen);
 
             std::vector<FunctionAST::Param> params;
@@ -95,7 +95,7 @@ Ref<ParsedFile> Parser::Parse()
 Ref<BlockAST> Parser::ParseBlock()
 {
     auto lcurly = m_stream.NextToken();
-    ExepctToBe(lcurly, TokenType::LCurly);
+    ExpectToBe(lcurly, TokenType::LCurly);
     Token token = m_stream.NextToken();
 
     std::vector<ExpressionOrStatement> statements;
@@ -294,7 +294,7 @@ Ref<ExpressionAST> Parser::ParsePrimary()
     while (token.type == TokenType::Dot)
     {
         auto member = m_stream.NextToken();
-        ExepctToBe(member, TokenType::Identifier);
+        ExpectToBe(member, TokenType::Identifier);
         primary = MakeRef<MemberAccessExpressionAST>(token.location, primary, member.stringValue);
         token = m_stream.NextToken();
     }
@@ -410,7 +410,7 @@ std::pair<BinaryOperation, Location> Parser::ParseOperation()
 Ref<Type> Parser::ParseType(bool allowVoid)
 {
     Token typeToken = m_stream.NextToken();
-    ExepctToBe(typeToken, TokenType::Identifier);
+    ExpectToBe(typeToken, TokenType::Identifier);
 
     Ref<Type> type;
     if (typeToken.stringValue == "int8" || typeToken.stringValue == "uint8")
@@ -443,7 +443,7 @@ Ref<Type> Parser::ParseType(bool allowVoid)
     else if (modifier.type == TokenType::LSquareBracket)
     {
         auto size = m_stream.NextToken();
-        ExepctToBe(size, TokenType::Number);
+        ExpectToBe(size, TokenType::Number);
         ExpectToken(TokenType::RSquareBracket);
         return MakeRef<ArrayType>(type, size.intValue);
     }
@@ -462,7 +462,7 @@ void Parser::ExpectToken(TokenType tokenType)
         g_context->Error(token.location, "Unexpected token %s, expected %s", token.ToString().c_str(), TokenTypeToString(tokenType).c_str());
 }
 
-void Parser::ExepctToBe(Token token, TokenType tokenType)
+void Parser::ExpectToBe(Token token, TokenType tokenType)
 {
     if (token.type != tokenType)
         g_context->Error(token.location, "Unexpected token %s, expected %s", token.ToString().c_str(), TokenTypeToString(tokenType).c_str());

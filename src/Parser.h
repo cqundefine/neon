@@ -25,7 +25,7 @@ private:
     Ref<Type> ParseType(bool allowVoid = false);
 
     void ExpectToken(TokenType tokenType);
-    void ExepctToBe(Token token, TokenType tokenType);
+    void ExpectToBe(Token token, TokenType tokenType);
 
     TokenStream m_stream;
 };
