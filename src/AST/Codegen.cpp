@@ -354,7 +354,7 @@ void IfStatementAST::Codegen() const
     if (conditionCodegenned->getType()->getTypeID() != llvm::Type::TypeID::IntegerTyID)
         g_context->Error(condition->location, "Condition must be an integer, this is probably a typechecker bug");
     auto bits = conditionCodegenned->getType()->getIntegerBitWidth();
-    auto conditionFinal = g_context->builder->CreateICmpNE(conditionCodegenned, llvm::ConstantInt::get(*g_context->llvmContext, llvm::APInt(bits, 0)), "whilecmpne");
+    auto conditionFinal = g_context->builder->CreateICmpNE(conditionCodegenned, llvm::ConstantInt::get(*g_context->llvmContext, llvm::APInt(bits, 0)), "ifcmpne");
     
     auto parentFunction = g_context->builder->GetInsertBlock()->getParent();
 
