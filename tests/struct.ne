@@ -13,7 +13,7 @@ function modifyA(a: A): void
 
 function main(): int32
 {
-    a: A;
+    var a: A;
     a.a = 1;
     a.b = 2;
     modifyA(a);

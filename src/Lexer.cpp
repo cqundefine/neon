@@ -2,7 +2,7 @@
 
 TokenStream CreateTokenStream(uint32_t fileID)
 {
-    static_assert(static_cast<uint32_t>(TokenType::_TokenTypeCount) == 33, "Not all tokens are handled in Lexer::NextToken()");
+    static_assert(static_cast<uint32_t>(TokenType::_TokenTypeCount) == 37, "Not all tokens are handled in Lexer::NextToken()");
 
     std::vector<Token> tokens;
     size_t index = 0;
@@ -178,6 +178,12 @@ TokenStream CreateTokenStream(uint32_t fileID)
             tokens.push_back({ .type = TokenType::Dot, .location = { fileID, index - 1 } });
             continue;
         }
+        else if (file[index] == '#')
+        {
+            index++;
+            tokens.push_back({ .type = TokenType::Hash, .location = { fileID, index - 1 } });
+            continue;
+        }
         else if (file[index] == '"')
         {
             uint32_t trueBeginIndex = index;
@@ -301,6 +307,21 @@ TokenStream CreateTokenStream(uint32_t fileID)
             else if (value == "struct")
             {
                 tokens.push_back({ .type = TokenType::Struct, .location = { fileID, trueBeginIndex } });
+                continue;
+            }
+            else if (value == "var")
+            {
+                tokens.push_back({ .type = TokenType::Var, .location = { fileID, trueBeginIndex } });
+                continue;
+            }
+            else if (value == "const")
+            {
+                tokens.push_back({ .type = TokenType::Const, .location = { fileID, trueBeginIndex } });
+                continue;
+            }
+            else if (value == "endif")
+            {
+                tokens.push_back({ .type = TokenType::Endif, .location = { fileID, trueBeginIndex } });
                 continue;
             }
             else

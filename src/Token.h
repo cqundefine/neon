@@ -33,6 +33,7 @@ enum class TokenType
     LessThanOrEqual,
     ExclamationMark,
     Dot,
+    Hash,
 
     // Keywords
     Function,
@@ -42,6 +43,9 @@ enum class TokenType
     While,
     Include,
     Struct,
+    Var,
+    Const,
+    Endif,
 
     _TokenTypeCount
 };

@@ -49,6 +49,7 @@ NON_OPTIMIZED = "non-optimized"
 OPTIMIZED = "optimized"
 
 target = "./tests/"
+output_target = "./tests_build/"
 
 def cmd_run(cmd, **kwargs):
     return subprocess.run(cmd, **kwargs)
@@ -129,7 +130,12 @@ def run_pass(file_path: str, tc: TestCase, stats: RunStats, compiler_args, pass_
 
     print(f"{INFO}: Testing {human_test_name} ({pass_type}): ", end="")
 
-    compilation = cmd_run([COMPILER_PATH, *compiler_args, file_path], capture_output=True)
+    output_location = os.path.join(output_target, os.path.dirname(file_path)[len(target):])
+    os.makedirs(output_location, exist_ok=True)
+
+    output_filename = os.path.join(output_location, os.path.basename(file_path)[:-len(NEON_EXT)])
+
+    compilation = cmd_run([COMPILER_PATH, *compiler_args, "-o", output_filename, file_path], capture_output=True)
     if compilation.returncode != 0:
         stats.failed += 1
         if compilation.returncode == -11:
@@ -145,7 +151,7 @@ def run_pass(file_path: str, tc: TestCase, stats: RunStats, compiler_args, pass_
         print(DOESNT_BUILD)
         return
 
-    application = cmd_run([file_path[:-len(NEON_EXT)], *tc.argv], input=tc.stdin, capture_output=True)
+    application = cmd_run([output_filename, *tc.argv], input=tc.stdin, capture_output=True)
 
     if application.returncode != tc.returncode:
         print(FAILURE)
@@ -194,7 +200,14 @@ def run_test_for_file(file_path: str, stats: RunStats = RunStats()):
 
     if not tc.builds:
         print(f"{INFO}: Testing {human_test_name} expected build fail: ", end="")
-        compilation = cmd_run([COMPILER_PATH, file_path], capture_output=True)
+
+        # NOTE: Even though we expect this to fail, it might still produce an output file.
+        output_location = os.path.join(output_target, os.path.dirname(file_path)[len(target):])
+        os.makedirs(output_location, exist_ok=True)
+
+        output_filename = os.path.join(output_location, os.path.basename(file_path)[:-len(NEON_EXT)])
+
+        compilation = cmd_run([COMPILER_PATH, "-o", output_filename, file_path], capture_output=True)
         if compilation.returncode == 1:
             stats.passed += 1
             print(PASS)
@@ -292,14 +305,24 @@ if __name__ == "__main__":
     group = parser.add_mutually_exclusive_group()
     group.add_argument("-u", "--update", action="store_true", help="update the output of the tests")
     group.add_argument("--update-input", action="store_true", help="update the input of the tests")
+    parser.add_argument("-o", "--output", help="output target", default="./tests_build/")
     parser.add_argument("target", help="target to run the tests on", default="./tests/", nargs='?')
     args = parser.parse_args()
 
     target = args.target
+    output_target = args.output
+
+    if target == output_target:
+        print(f"{ERROR}: target and output cannot be the same")
+        exit(1)
 
     if not path.exists(target):
         print(f"{ERROR}: {target} does not exist")
         exit(1)
+
+    if not path.exists(output_target):
+        print(f"{INFO}: Creating output target {output_target}")
+        os.makedirs(output_target)
 
     if args.update:
         if path.isdir(target):

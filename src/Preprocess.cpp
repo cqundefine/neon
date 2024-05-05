@@ -33,6 +33,49 @@ TokenStream PreprocessSubfile(TokenStream stream)
 
             IncludeFile(stream, path.stringValue);
         }
+        else if (token.type == TokenType::Hash)
+        {
+            auto directive = stream.NextToken();
+            if (directive.type == TokenType::If)
+            {
+                auto condition = stream.NextToken();
+                if (condition.type != TokenType::Identifier)
+                    g_context->Error(condition.location, "Expected identifier after #if");
+
+                stream.RemoveLastToken();
+                stream.RemoveLastToken();
+                stream.RemoveLastToken();
+
+                bool conditionValue = std::find(g_context->defines.begin(), g_context->defines.end(), condition.stringValue) != g_context->defines.end();
+                while (true)
+                {
+                    auto token = stream.NextToken();
+                    if (token.type == TokenType::Eof)
+                        g_context->Error(token.location, "Unexpected EOF in #if block");
+
+                    if (token.type == TokenType::Hash)
+                    {
+                        auto directive = stream.NextToken();
+                        if (directive.type == TokenType::Endif)
+                        {
+                            stream.RemoveLastToken();
+                            stream.RemoveLastToken();
+                            break;
+                        }
+                        else
+                            g_context->Error(directive.location, "Unknown preprocessor directive, unexpected token: %s", directive.ToString().c_str());
+                    }
+                    else if (!conditionValue)
+                    {
+                        stream.RemoveLastToken();
+                    }
+                }
+            }
+            else
+            {
+                g_context->Error(directive.location, "Unknown preprocessor directive, unexpected token: %s", directive.ToString().c_str());
+            }
+        }
     }
 
     stream.Reset();

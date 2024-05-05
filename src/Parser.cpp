@@ -144,35 +144,25 @@ ExpressionOrStatement Parser::ParseStatement()
         auto block = ParseBlock();
         return MakeRef<WhileStatementAST>(token.location, condition, block);
     }
-    else if (token.type == TokenType::Identifier)
+    else if (token.type == TokenType::Var || token.type == TokenType::Const)
     {
-        Token colon = m_stream.NextToken();
-        if (colon.type == TokenType::Colon)
+        Token name = m_stream.NextToken();
+        ExpectToken(TokenType::Colon);
+        auto type = ParseType();
+        auto equalsOrSemicolon = m_stream.NextToken();
+        if (equalsOrSemicolon.type == TokenType::Semicolon)
         {
-            auto type = ParseType();
-            auto equalsOrSemicolon = m_stream.NextToken();
-            if (equalsOrSemicolon.type == TokenType::Semicolon)
-            {
-                return MakeRef<VariableDefinitionAST>(token.location, token.stringValue, type, nullptr);
-            }
-            else if (equalsOrSemicolon.type == TokenType::Equals)
-            {
-                auto initialValue = ParseExpression();
-                ExpectToken(TokenType::Semicolon);
-                return MakeRef<VariableDefinitionAST>(token.location, token.stringValue, type, initialValue);
-            }
-            else
-            {
-                g_context->Error(equalsOrSemicolon.location, "Unexpected token: %s", equalsOrSemicolon.ToString().c_str());
-            }
+            return MakeRef<VariableDefinitionAST>(token.location, name.stringValue, type, token.type == TokenType::Const, nullptr);
+        }
+        else if (equalsOrSemicolon.type == TokenType::Equals)
+        {
+            auto initialValue = ParseExpression();
+            ExpectToken(TokenType::Semicolon);
+            return MakeRef<VariableDefinitionAST>(token.location, name.stringValue, type, token.type == TokenType::Const, initialValue);
         }
         else
         {
-            m_stream.PreviousToken();
-            m_stream.PreviousToken();
-            auto expression = ParseExpression();
-            ExpectToken(TokenType::Semicolon);
-            return expression;
+            g_context->Error(equalsOrSemicolon.location, "Unexpected token: %s", equalsOrSemicolon.ToString().c_str());
         }
     }
     else

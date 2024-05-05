@@ -9,10 +9,7 @@ build
 output*
 NOTES.md
 
-tests/**/*
-!tests/*/
-!tests/**/*.ne
-!tests/**/*.txt
+tests_build
 
 vscode/*.vsix
 

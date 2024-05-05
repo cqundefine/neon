@@ -2,8 +2,8 @@ include "Standard"
 
 function main(): int32
 {
-    var: int8 = 2;
-    if var == 2 {
+    var num: int8 = 2;
+    if num == 2 {
         print("It works!\n");
     } else {
         print("Error!\n");

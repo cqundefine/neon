@@ -2,8 +2,13 @@
 #include <Context.h>
 #include <llvm/IR/Type.h>
 
-static std::vector<std::map<std::string, Ref<Type>>> blockStack;
-[[nodiscard]] static Ref<Type> FindVariable(const std::string& name, Location location)
+struct VariableInfo
+{
+    Ref<Type> type;
+    bool isConst;
+};
+static std::vector<std::map<std::string, VariableInfo>> blockStack;
+[[nodiscard]] static VariableInfo FindVariable(const std::string& name, Location location)
 {
     for (int i = blockStack.size() - 1; i >= 0; i--)
     {
@@ -30,7 +35,7 @@ void NumberExpressionAST::Typecheck() const
 
 void VariableExpressionAST::Typecheck() const
 {
-    type = FindVariable(name, location);
+    type = FindVariable(name, location).type;
 }
 
 void StringLiteralAST::Typecheck() const
@@ -50,6 +55,9 @@ void BinaryExpressionAST::Typecheck() const
 
     if (binaryOperation == BinaryOperation::Assignment && lhs->type != ExpressionType::Variable && lhs->type != ExpressionType::ArrayAccess && lhs->type != ExpressionType::Dereference && lhs->type != ExpressionType::MemberAccess)
         g_context->Error(location, "Can't assign to non-variable expression");
+
+    if (binaryOperation == BinaryOperation::Assignment && lhs->type == ExpressionType::Variable && FindVariable(StaticRefCast<VariableExpressionAST>(lhs)->name, lhs->location).isConst)
+        g_context->Error(location, "Can't assign to const variable");
 }
 
 void CallExpressionAST::Typecheck() const
@@ -122,7 +130,7 @@ void MemberAccessExpressionAST::Typecheck() const
 
 void ReturnStatementAST::Typecheck() const
 {
-    returnedType = FindVariable(typecheckCurrentFunction, location);
+    returnedType = FindVariable(typecheckCurrentFunction, location).type;
 
     if (value != nullptr)
     {
@@ -174,6 +182,9 @@ void VariableDefinitionAST::Typecheck() const
             g_context->Error(location, "Can't find struct: %s", structType->name.c_str());
     }
 
+    if (isConst && initialValue == nullptr)
+        g_context->Error(location, "Const variable must have an initial value");
+
     if (initialValue != nullptr)
     {
         initialValue->Typecheck();
@@ -188,7 +199,7 @@ void VariableDefinitionAST::Typecheck() const
         }
     }
 
-    blockStack.back()[name] = type;
+    blockStack.back()[name] = { type, isConst };
 }
 
 void FunctionAST::Typecheck() const
@@ -199,7 +210,7 @@ void FunctionAST::Typecheck() const
     typecheckCurrentFunction = name;
     blockStack.push_back({});
 
-    blockStack.back()[name] = returnType;
+    blockStack.back()[name] = { returnType, false };
 
     std::vector<Ref<Type>> typecheckParams;
     for (const auto& param : params)
@@ -213,7 +224,7 @@ void FunctionAST::Typecheck() const
                 g_context->Error(location, "Can't find struct: %s", structType->name.c_str());
         }
 
-        blockStack.back()[param.name] = param.type;
+        blockStack.back()[param.name] = { param.type, false };
     }
 
     if (returnType->type == TypeEnum::Struct)

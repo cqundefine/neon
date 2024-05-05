@@ -323,12 +323,14 @@ struct VariableDefinitionAST : public StatementAST
 {
     std::string name;
     Ref<Type> type;
+    bool isConst;
     Ref<ExpressionAST> initialValue;
 
-    inline VariableDefinitionAST(Location location, const std::string& name, Ref<Type> type, Ref<ExpressionAST> initialValue)
+    inline VariableDefinitionAST(Location location, const std::string& name, Ref<Type> type, bool isConst, Ref<ExpressionAST> initialValue)
         : StatementAST(location, StatementType::VariableDefinition)
         , name(name)
         , type(type)
+        , isConst(isConst)
         , initialValue(initialValue)
     {
     }

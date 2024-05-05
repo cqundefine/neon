@@ -3,7 +3,7 @@
 
 std::string TokenTypeToString(TokenType tokenType)
 {
-    static_assert(static_cast<uint32_t>(TokenType::_TokenTypeCount) == 33, "Not all tokens are handled in Token::ToString()");
+    static_assert(static_cast<uint32_t>(TokenType::_TokenTypeCount) == 37, "Not all tokens are handled in Token::ToString()");
 
     switch (tokenType)
     {
@@ -59,6 +59,8 @@ std::string TokenTypeToString(TokenType tokenType)
             return "ExclamationMark";
         case TokenType::Dot:
             return "Dot";
+        case TokenType::Hash:
+            return "Hash";
         case TokenType::Function:
             return "Function";
         case TokenType::Return:
@@ -73,6 +75,12 @@ std::string TokenTypeToString(TokenType tokenType)
             return "Include";
         case TokenType::Struct:
             return "Struct";
+        case TokenType::Var:
+            return "Var";
+        case TokenType::Const:
+            return "Const";
+        case TokenType::Endif:
+            return "Endif";
         default:
             assert(false);
     }
@@ -80,7 +88,7 @@ std::string TokenTypeToString(TokenType tokenType)
 
 std::string Token::ToString()
 {
-    static_assert(static_cast<uint32_t>(TokenType::_TokenTypeCount) == 33, "Not all tokens are handled in Token::ToString()");
+    static_assert(static_cast<uint32_t>(TokenType::_TokenTypeCount) == 37, "Not all tokens are handled in Token::ToString()");
     switch (type)
     {
         case TokenType::Number:
@@ -135,6 +143,8 @@ std::string Token::ToString()
             return "LessThan (`!`)";
         case TokenType::Dot:
             return "Dot (`.`)";
+        case TokenType::Hash:
+            return "Hash (`#`)";
         case TokenType::Function:
             return "Function (`function`)";
         case TokenType::Return:
@@ -149,6 +159,12 @@ std::string Token::ToString()
             return "Include (`include`)";
         case TokenType::Struct:
             return "Struct (`struct`)";
+        case TokenType::Var:
+            return "Var (`var`)";
+        case TokenType::Const:
+            return "Const (`const`)";
+        case TokenType::Endif:
+            return "Endif (`endif`)";
         default:
             return "Invalid";
     }

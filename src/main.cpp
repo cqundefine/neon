@@ -12,6 +12,9 @@ int main(int argc, char** argv)
     program.add_argument("filename")
         .help("input file");
 
+    program.add_argument("-o")
+        .help("output file");
+
     program.add_argument("-c")
         .help("compile to object file")
         .flag();
@@ -23,6 +26,9 @@ int main(int argc, char** argv)
     program.add_argument("-O")
         .help("optimize")
         .flag();
+
+    program.add_argument("--target")
+        .help("target triple");
 
     auto& dumpGroup = program.add_mutually_exclusive_group();
 
@@ -53,7 +59,7 @@ int main(int argc, char** argv)
         exit(1);
     }
 
-    g_context = MakeRef<Context>(program.get("filename"));
+    g_context = MakeRef<Context>(program.get("filename"), program.present("--target"));
 
     g_context->optimize = program["-O"] == true;
 
@@ -80,11 +86,11 @@ int main(int argc, char** argv)
     if (program["--dump-ir"] == true)
         g_context->module->print(llvm::outs(), nullptr);
     else if (program["--dump-asm"] == true)
-        g_context->Write(Context::OutputFileType::Assembly);
+        g_context->Write(Context::OutputFileType::Assembly, program.present("-o"));
     else if (program["-c"] == true)
-        g_context->Write(Context::OutputFileType::Object);
+        g_context->Write(Context::OutputFileType::Object, program.present("-o"));
     else
-        g_context->Write(Context::OutputFileType::Executable, program["--run"] == true);
+        g_context->Write(Context::OutputFileType::Executable, program.present("-o"), program["--run"] == true);
 
     return 0;
 }

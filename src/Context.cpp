@@ -22,7 +22,7 @@ Ref<Context> g_context;
 
 uint32_t lastFileID = 0;
 
-#define CREATE_SYSCALL(N, REGS)                                                                                                                                                                         \
+#define CREATE_SYSCALL(N, MNEMONIC, RET, REGS)                                                                                                                                                                         \
     {                                                                                                                                                                                                   \
         auto int64Type = llvm::Type::getInt64Ty(*llvmContext);                                                                                                                                          \
         std::vector<llvm::Type*> syscall##N##Args {};                                                                                                                                                   \
@@ -35,12 +35,12 @@ uint32_t lastFileID = 0;
             syscall##N##ArgsValues.push_back(&arg);                                                                                                                                                     \
         auto syscall##N##Block = llvm::BasicBlock::Create(*llvmContext, "entry", syscall##N);                                                                                                           \
         builder->SetInsertPoint(syscall##N##Block);                                                                                                                                                     \
-        auto syscall##N##AsmCall = llvm::InlineAsm::get(syscall##N##Type, "syscall", "={ax}," REGS ",~{memory},~{dirflag},~{fpsr},~{flags}", true, true, llvm::InlineAsm::AsmDialect::AD_Intel, false); \
+        auto syscall##N##AsmCall = llvm::InlineAsm::get(syscall##N##Type, MNEMONIC, "=" RET "," REGS ",~{memory},~{dirflag},~{fpsr},~{flags}", true, true, llvm::InlineAsm::AsmDialect::AD_ATT, false); \
         auto syscall##N##Result = builder->CreateCall(syscall##N##AsmCall, syscall##N##ArgsValues);                                                                                                     \
         builder->CreateRet(syscall##N##Result);                                                                                                                                                         \
     }
 
-Context::Context(const std::string& baseFile)
+Context::Context(const std::string& baseFile, std::optional<std::string> passedTarget)
 {
     rootFileID = LoadFile(baseFile);
 
@@ -70,7 +70,7 @@ Context::Context(const std::string& baseFile)
     passBuilder.registerFunctionAnalyses(*functionAnalysisManager);
     passBuilder.crossRegisterProxies(*loopAnalysisManager, *functionAnalysisManager, *cgsccAnalysisManager, *moduleAnalysisManager);
 
-    auto targetTriple = llvm::sys::getDefaultTargetTriple();
+    auto targetTriple = passedTarget.has_value()  ? passedTarget.value() : llvm::sys::getDefaultTargetTriple();
 
     llvm::InitializeAllTargetInfos();
     llvm::InitializeAllTargets();
@@ -92,13 +92,34 @@ Context::Context(const std::string& baseFile)
     module->setDataLayout(targetMachine->createDataLayout());
     module->setTargetTriple(targetTriple);
 
-    CREATE_SYSCALL(0, "{ax}");
-    CREATE_SYSCALL(1, "{ax},{di}");
-    CREATE_SYSCALL(2, "{ax},{di},{si}");
-    CREATE_SYSCALL(3, "{ax},{di},{si},{dx}");
-    CREATE_SYSCALL(4, "{ax},{di},{si},{dx},{r10}");
-    CREATE_SYSCALL(5, "{ax},{di},{si},{dx},{r10},{r8}");
-    CREATE_SYSCALL(6, "{ax},{di},{si},{dx},{r10},{r8},{r9}");
+    std::string arch = targetMachine->getTarget().getName();
+
+    if (arch == "x86-64")
+    {
+        CREATE_SYSCALL(0, "syscall", "{ax}", "{ax}");
+        CREATE_SYSCALL(1, "syscall", "{ax}", "{ax},{di}");
+        CREATE_SYSCALL(2, "syscall", "{ax}", "{ax},{di},{si}");
+        CREATE_SYSCALL(3, "syscall", "{ax}", "{ax},{di},{si},{dx}");
+        CREATE_SYSCALL(4, "syscall", "{ax}", "{ax},{di},{si},{dx},{r10}");
+        CREATE_SYSCALL(5, "syscall", "{ax}", "{ax},{di},{si},{dx},{r10},{r8}");
+        CREATE_SYSCALL(6, "syscall", "{ax}", "{ax},{di},{si},{dx},{r10},{r8},{r9}");
+        defines.push_back("X86_64");
+    }
+    else if (arch == "aarch64")
+    {
+        CREATE_SYSCALL(0, "svc #0", "{x0}", "{x8}");
+        CREATE_SYSCALL(1, "svc #0", "{x0}", "{x8},{x0}");
+        CREATE_SYSCALL(2, "svc #0", "{x0}", "{x8},{x0},{x1}");
+        CREATE_SYSCALL(3, "svc #0", "{x0}", "{x8},{x0},{x1},{x2}");
+        CREATE_SYSCALL(4, "svc #0", "{x0}", "{x8},{x0},{x1},{x2},{x3}");
+        CREATE_SYSCALL(5, "svc #0", "{x0}", "{x8},{x0},{x1},{x2},{x3},{x4}");
+        CREATE_SYSCALL(6, "svc #0", "{x0}", "{x8},{x0},{x1},{x2},{x3},{x4},{x5}");
+        defines.push_back("AArch64");
+    }
+    else
+    {
+        fprintf(stderr, "Unsupported architecture: %s, not enabling syscalls or preprocessor arch directives!\n", arch.c_str());
+    }
 }
 
 uint32_t Context::LoadFile(const std::string& filename)
@@ -156,7 +177,7 @@ std::pair<uint32_t, uint32_t> Context::LineColumnFromLocation(Location location)
     exit(1);
 }
 
-void Context::Write(OutputFileType fileType, bool run) const
+void Context::Write(OutputFileType fileType, std::optional<std::string> outputLocation, bool run) const
 {
     assert(!run || fileType == OutputFileType::Executable);
 
@@ -178,11 +199,27 @@ void Context::Write(OutputFileType fileType, bool run) const
         g_context->Error(LocationNone, "No main function found");
     }
 
-    auto sourceFilenameWithoutExtension = files.at(0).filename.substr(0, files.at(0).filename.length() - files.at(0).filename.substr(files.at(0).filename.find_last_of('.') + 1).length() - 1);
-    auto outputFilename = fileType == OutputFileType::Assembly ? sourceFilenameWithoutExtension + ".asm" : sourceFilenameWithoutExtension + ".o";
+    auto mainFile = files.at(0).filename;
+
+    auto baseFilename = mainFile.substr(mainFile.find_last_of("/\\") + 1);
+    auto fileWithoutExtension = baseFilename.substr(0, baseFilename.find_last_of('.'));
+
+    std::string objectFilename;
+    if (fileType == OutputFileType::Executable)
+    {
+        objectFilename = std::filesystem::temp_directory_path() / ("tempobject" + baseFilename + ".o");
+    }
+    else if (outputLocation.has_value())
+    {
+        objectFilename = outputLocation.value();
+    }
+    else
+    {
+        objectFilename = fileType == OutputFileType::Assembly ? fileWithoutExtension + ".asm" : fileWithoutExtension + ".o";;
+    }
 
     std::error_code errorCode;
-    llvm::raw_fd_ostream outputStream(outputFilename, errorCode, llvm::sys::fs::OF_None);
+    llvm::raw_fd_ostream outputStream(objectFilename, errorCode, llvm::sys::fs::OF_None);
 
     if (errorCode)
     {
@@ -202,8 +239,14 @@ void Context::Write(OutputFileType fileType, bool run) const
     outputStream.flush();
 
     if (fileType == OutputFileType::Executable)
-        system((std::string("gcc ") + outputFilename + " -o " + sourceFilenameWithoutExtension + " -no-pie").c_str());
+    {
+        std::string binaryFilename = outputLocation.has_value() ? outputLocation.value() : fileWithoutExtension;
 
-    if (run)
-        system((std::string("./") + sourceFilenameWithoutExtension).c_str());
+        system((std::string("gcc ") + objectFilename + " -o " + binaryFilename + " -no-pie").c_str());
+
+        std::filesystem::remove(objectFilename);
+
+        if (run)
+            system((std::string("./") + binaryFilename).c_str());
+    }
 }

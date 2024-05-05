@@ -12,7 +12,7 @@
 
 struct Context
 {
-    Context(const std::string& baseFile);
+    Context(const std::string& baseFile, std::optional<std::string> target);
 
     Own<llvm::LLVMContext> llvmContext;
     Own<llvm::Module> module;
@@ -49,6 +49,8 @@ struct Context
     uint32_t rootFileID;
     std::map<uint32_t, FileInfo> files;
 
+    std::vector<std::string> defines;
+
     uint32_t LoadFile(const std::string& filename);
 
     std::pair<uint32_t, uint32_t> LineColumnFromLocation(Location location) const;
@@ -61,7 +63,7 @@ struct Context
         Executable
     };
 
-    void Write(OutputFileType fileType, bool run = false) const;
+    void Write(OutputFileType fileType, std::optional<std::string> outputLocation, bool run = false) const;
 };
 
 extern Ref<Context> g_context;
