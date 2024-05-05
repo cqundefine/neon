@@ -278,10 +278,15 @@ def update_output_for_file(file_path: str):
 
     human_test_name = f"`{file_path[len(target):-len(NEON_EXT)]}`"
 
-    compilation = cmd_run([COMPILER_PATH, file_path], capture_output=True)
+    output_location = os.path.join(output_target, os.path.dirname(file_path)[len(target):])
+    os.makedirs(output_location, exist_ok=True)
+
+    output_filename = os.path.join(output_location, os.path.basename(file_path)[:-len(NEON_EXT)])
+
+    compilation = cmd_run([COMPILER_PATH, "-o", output_filename, file_path], capture_output=True)
 
     if compilation.returncode == 0:
-        output = cmd_run([file_path[:-len(NEON_EXT)], *tc.argv], input=tc.stdin, capture_output=True)
+        output = cmd_run([output_filename, *tc.argv], input=tc.stdin, capture_output=True)
         print(f"{INFO} Saving output for {human_test_name} to {tc_path}")
         save_test_case(tc_path, True, tc.argv, tc.stdin, output.returncode, output.stdout, output.stderr)
     elif compilation.returncode == -11:
