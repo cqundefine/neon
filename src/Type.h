@@ -24,6 +24,7 @@ struct Type
     virtual llvm::Type* GetType() const = 0;
     virtual std::string Dump() const = 0;
     virtual bool Equals(const Type& other) const = 0;
+    virtual void Typecheck(Location) const {};
 
     virtual std::string ReadableName() const = 0;
 
@@ -91,6 +92,7 @@ struct PointerType : public Type
     virtual llvm::Type* GetType() const override;
     virtual std::string Dump() const override;
     virtual bool Equals(const Type& other) const override;
+    virtual void Typecheck(Location location) const override { underlayingType->Typecheck(location); };
 
     virtual std::string ReadableName() const override;
 };
@@ -108,6 +110,7 @@ struct StructType : public Type
     virtual llvm::Type* GetType() const override;
     virtual std::string Dump() const override;
     virtual bool Equals(const Type& other) const override;
+    virtual void Typecheck(Location) const override;
 
     virtual std::string ReadableName() const override;
 

@@ -24,7 +24,7 @@ Ref<ParsedFile> Parser::Parse()
             while (maybeName.type == TokenType::Identifier)
             {
                 ExpectToken(TokenType::Colon);
-                auto type = ParseType();
+                auto type = ParseType().first;
 
                 params.push_back({ maybeName.stringValue, type });
 
@@ -40,7 +40,7 @@ Ref<ParsedFile> Parser::Parse()
             ExpectToken(TokenType::RParen);
             ExpectToken(TokenType::Colon);
 
-            auto returnType = ParseType(true);
+            auto returnType = ParseType(true).first;
 
             Ref<BlockAST> block;
             if (token.type == TokenType::Extern)
@@ -56,15 +56,15 @@ Ref<ParsedFile> Parser::Parse()
                 g_context->Error(nameToken.location, "Expected struct name");
             ExpectToken(TokenType::LCurly);
 
-            std::map<std::string, Ref<Type>> members;
+            std::map<std::string, std::pair<Ref<Type>, Location>> members;
 
             while (m_stream.PeekToken().type == TokenType::Identifier)
             {
                 auto name = m_stream.NextToken();
                 ExpectToken(TokenType::Colon);
-                auto type = ParseType();
+                auto typeLocation = ParseType();
 
-                members[name.stringValue] = type;
+                members[name.stringValue] = typeLocation;
 
                 ExpectToken(TokenType::Semicolon);
             }
@@ -72,15 +72,12 @@ Ref<ParsedFile> Parser::Parse()
             ExpectToken(TokenType::RCurly);
 
             std::vector<llvm::Type*> llvmMembers;
+            std::map<std::string, Ref<Type>> rawMembers;
             for (auto& [name, type] : members)
             {
-                if (type->type == TypeEnum::Struct)
-                {
-                    auto structType = StaticRefCast<StructType>(type);
-                    if (g_context->structs.find(structType->name) == g_context->structs.end())
-                        g_context->Error(nameToken.location, "Can't find struct: %s", structType->name.c_str());
-                }
-                llvmMembers.push_back(type->GetType());
+                type.first->Typecheck(type.second);
+                llvmMembers.push_back(type.first->GetType());
+                rawMembers[name] = type.first;
             }
 
             if (llvmMembers.empty())
@@ -88,7 +85,7 @@ Ref<ParsedFile> Parser::Parse()
 
             g_context->structs[nameToken.stringValue] = {
                 .name = nameToken.stringValue,
-                .members = members,
+                .members = rawMembers,
                 .llvmType = llvm::StructType::create(llvmMembers, nameToken.stringValue)
             };
         }
@@ -180,7 +177,7 @@ Ref<VariableDefinitionAST> Parser::ParseVariableDefinition()
     Token declaration = m_stream.NextToken();
     Token name = m_stream.NextToken();
     ExpectToken(TokenType::Colon);
-    auto type = ParseType();
+    auto type = ParseType().first;
     auto equalsOrSemicolon = m_stream.NextToken();
     if (equalsOrSemicolon.type == TokenType::Semicolon)
     {
@@ -384,7 +381,7 @@ Ref<ExpressionAST> Parser::ParseBarePrimary()
     else if (first.type == TokenType::To)
     {
         ExpectToken(TokenType::LessThan);
-        auto type = ParseType();
+        auto type = ParseType().first;
         ExpectToken(TokenType::GreaterThan);
         ExpectToken(TokenType::LParen);
         auto child = ParseExpression();
@@ -432,7 +429,7 @@ std::pair<BinaryOperation, Location> Parser::ParseOperation()
     }
 }
 
-Ref<Type> Parser::ParseType(bool allowVoid)
+std::pair<Ref<Type>, Location> Parser::ParseType(bool allowVoid)
 {
     Token typeToken = m_stream.NextToken();
     ExpectToBe(typeToken, TokenType::Identifier);
@@ -470,14 +467,14 @@ Ref<Type> Parser::ParseType(bool allowVoid)
         auto size = m_stream.NextToken();
         ExpectToBe(size, TokenType::Number);
         ExpectToken(TokenType::RSquareBracket);
-        return MakeRef<ArrayType>(type, size.intValue);
+        return { MakeRef<ArrayType>(type, size.intValue) , typeToken.location };
     }
     else
     {
         m_stream.PreviousToken();
     }
 
-    return type;
+    return { type, typeToken.location };
 }
 
 void Parser::ExpectToken(TokenType tokenType)

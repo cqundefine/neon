@@ -129,6 +129,12 @@ std::string VoidType::ReadableName() const
 // Other
 // --------------------------
 
+void StructType::Typecheck(Location location) const
+{
+    if (g_context->structs.find(name) == g_context->structs.end())
+        g_context->Error(location, "Can't find struct: %s", name.c_str());
+}
+
 llvm::Type* StructType::GetUnderlayingType() const
 {
     return g_context->structs.at(name).llvmType;

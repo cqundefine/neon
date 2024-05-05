@@ -175,12 +175,7 @@ void WhileStatementAST::Typecheck() const
 
 void VariableDefinitionAST::Typecheck() const
 {
-    if (type->type == TypeEnum::Struct)
-    {
-        auto structType = StaticRefCast<StructType>(type);
-        if (g_context->structs.find(structType->name) == g_context->structs.end())
-            g_context->Error(location, "Can't find struct: %s", structType->name.c_str());
-    }
+    type->Typecheck(location);
 
     if (isConst && initialValue == nullptr)
         g_context->Error(location, "Const variable must have an initial value");
@@ -216,22 +211,12 @@ void FunctionAST::Typecheck() const
     {
         typecheckParams.push_back(param.type);
 
-        if (param.type->type == TypeEnum::Struct)
-        {
-            auto structType = StaticRefCast<StructType>(param.type);
-            if (g_context->structs.find(structType->name) == g_context->structs.end())
-                g_context->Error(location, "Can't find struct: %s", structType->name.c_str());
-        }
+        param.type->Typecheck(location);
 
         blockStack.back()[param.name] = { param.type, false };
     }
 
-    if (returnType->type == TypeEnum::Struct)
-    {
-        auto structType = StaticRefCast<StructType>(returnType);
-        if (g_context->structs.find(structType->name) == g_context->structs.end())
-            g_context->Error(location, "Can't find struct: %s", structType->name.c_str());
-    }
+    returnType->Typecheck(location);
 
     typecheckFunctions[name] = {
         .params = typecheckParams,
