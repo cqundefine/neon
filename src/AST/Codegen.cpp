@@ -16,8 +16,8 @@ static std::vector<std::map<std::string, llvm::AllocaInst*>> blockStack;
             return block.at(name);
     }
 
-    // FIXME: Shouldn't this be unreachable?
-    g_context->Error(location, "Can't find variable: %s", name.c_str());
+    fprintf(stderr, "COMPILER INTERNAL ERROR: Variable not found at codegen stage, this is a typechecker or codegen bug\n");
+    exit(1);
 }
 
 llvm::Value* NumberExpressionAST::Codegen(bool) const
