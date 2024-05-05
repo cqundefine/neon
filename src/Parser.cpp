@@ -82,6 +82,9 @@ Ref<ParsedFile> Parser::Parse()
                 llvmMembers.push_back(type->GetType());
             }
 
+            if (llvmMembers.empty())
+                llvmMembers.push_back(llvm::Type::getInt8Ty(*g_context->llvmContext));
+
             g_context->structs[nameToken.stringValue] = {
                 .name = nameToken.stringValue,
                 .members = members,
