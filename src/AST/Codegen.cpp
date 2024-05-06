@@ -255,7 +255,6 @@ llvm::Value* CallExpressionAST::Codegen(bool) const
 
 llvm::Value* CastExpressionAST::Codegen(bool) const
 {
-    assert(castedTo->type == TypeEnum::Integer);
     auto numberType = reinterpret_cast<IntegerType*>(castedTo.get());
     if (child->GetType()->type == TypeEnum::Integer && castedTo->type == TypeEnum::Integer)
         return g_context->builder->CreateIntCast(child->Codegen(), numberType->GetType(), StaticRefCast<IntegerType>(child->GetType())->isSigned, "intcast");
@@ -263,6 +262,8 @@ llvm::Value* CastExpressionAST::Codegen(bool) const
         return g_context->builder->CreateIntToPtr(child->Codegen(), numberType->GetType(), "inttoptr");
     else if (child->GetType()->type == TypeEnum::Pointer && castedTo->type == TypeEnum::Integer)
         return g_context->builder->CreatePtrToInt(child->Codegen(), numberType->GetType(), "ptrtoint");
+    else if (child->GetType()->type == TypeEnum::Pointer && castedTo->type == TypeEnum::Pointer)
+        return child->Codegen();
     else
         assert(false);
 }
