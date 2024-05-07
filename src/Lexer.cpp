@@ -255,6 +255,11 @@ TokenStream CreateTokenStream(uint32_t fileID)
                 {
                     index--;
                 }
+
+                if (base != 10 && index >= file.size())
+                {
+                    g_context->Error({ fileID, index }, "Unexpected end of file");
+                }
             }
             do
             {
