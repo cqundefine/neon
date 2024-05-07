@@ -193,6 +193,7 @@ Ref<VariableDefinitionAST> Parser::ParseVariableDefinition()
 {
     Token declaration = m_stream.NextToken();
     Token name = m_stream.NextToken();
+    ExpectToBe(name, TokenType::Identifier);
     ExpectToken(TokenType::Colon);
     auto type = ParseType().first;
     auto equalsOrSemicolon = m_stream.NextToken();
