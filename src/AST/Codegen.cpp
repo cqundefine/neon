@@ -78,20 +78,38 @@ static std::vector<std::map<std::string, Ref<VariableInfo>>> blockStack;
 }
 
 static bool isInsideFunction = false;
+static std::vector<llvm::DIScope*> debugScopes;
+
+llvm::DIScope* GetCurrentScope()
+{
+    return debugScopes.empty() ? g_context->debugCompileUnit : debugScopes.back();
+}
+
+void AST::EmitLocation() const
+{
+    if (g_context->debug)
+    {
+        auto scope = GetCurrentScope();
+        g_context->builder->SetCurrentDebugLocation(llvm::DILocation::get(scope->getContext(), location.line, location.column, scope));
+    }
+}
 
 llvm::Value* NumberExpressionAST::Codegen(bool) const
 {
+    EmitLocation();
     return EvaluateAsConstant();
 }
 
 llvm::Value* VariableExpressionAST::Codegen(bool) const
 {
+    EmitLocation();
     auto var = FindVariable(name, location);
     return g_context->builder->CreateLoad(var->GetType(), var->GetValue(), name);
 }
 
 llvm::Value* VariableExpressionAST::RawCodegen() const
 {
+    EmitLocation();
     if (type->type == TypeEnum::Struct)
         return FindVariable(name, location)->GetValue();
     return Codegen();
@@ -99,12 +117,14 @@ llvm::Value* VariableExpressionAST::RawCodegen() const
 
 llvm::Value* StringLiteralAST::Codegen(bool) const
 {
+    EmitLocation();
     auto value = EvaluateAsConstant();
     return new llvm::GlobalVariable(*g_context->module, value->getType(), true, llvm::GlobalVariable::ExternalLinkage, value);
 }
 
 llvm::Value* BinaryExpressionAST::Codegen(bool usedAsStatement) const
 {
+    EmitLocation();
     static_assert(static_cast<uint32_t>(BinaryOperation::_BinaryOperationCount) == 11, "Not all binary operations are handled in BinaryExpressionAST::Codegen()");
 
     if (binaryOperation == BinaryOperation::Assignment)
@@ -232,6 +252,7 @@ llvm::Value* BinaryExpressionAST::Codegen(bool usedAsStatement) const
 
 llvm::Value* CallExpressionAST::Codegen(bool) const
 {
+    EmitLocation();
     auto function = g_context->module->getFunction(calleeName);
     assert(function);
 
@@ -255,6 +276,7 @@ llvm::Value* CallExpressionAST::Codegen(bool) const
 
 llvm::Value* CastExpressionAST::Codegen(bool) const
 {
+    EmitLocation();
     auto numberType = reinterpret_cast<IntegerType*>(castedTo.get());
     if (child->GetType()->type == TypeEnum::Integer && castedTo->type == TypeEnum::Integer)
         return g_context->builder->CreateIntCast(child->Codegen(), numberType->GetType(), StaticRefCast<IntegerType>(child->GetType())->isSigned, "intcast");
@@ -270,6 +292,7 @@ llvm::Value* CastExpressionAST::Codegen(bool) const
 
 llvm::Value* ArrayAccessExpressionAST::Codegen(bool) const
 {
+    EmitLocation();
     auto var = FindVariable(array->name, location);
     auto gep = g_context->builder->CreateGEP(var->GetType(), var->GetValue(), index->Codegen(), "gep");
     return g_context->builder->CreateLoad(StaticRefCast<ArrayType>(array->GetType())->arrayType->GetType(), gep, array->name);
@@ -277,11 +300,13 @@ llvm::Value* ArrayAccessExpressionAST::Codegen(bool) const
 
 llvm::Value* DereferenceExpressionAST::Codegen(bool) const
 {
+    EmitLocation();
     return g_context->builder->CreateLoad(StaticRefCast<PointerType>(pointer->GetType())->underlayingType->GetType(), pointer->Codegen(), pointer->name);
 }
 
 llvm::Value* MemberAccessExpressionAST::Codegen(bool) const
 {
+    EmitLocation();
     assert(object->GetType()->type == TypeEnum::Struct);
     auto structType = StaticRefCast<StructType>(object->GetType());
 
@@ -326,6 +351,7 @@ llvm::Value* MemberAccessExpressionAST::Codegen(bool) const
 
 void ReturnStatementAST::Codegen() const
 {
+    EmitLocation();
     if (!value)
         g_context->builder->CreateRetVoid();
     else if (value->GetType()->type == TypeEnum::Integer)
@@ -336,6 +362,7 @@ void ReturnStatementAST::Codegen() const
 
 void BlockAST::Codegen() const
 {
+    EmitLocation();
     blockStack.push_back({});
 
     for (const auto& statement : statements)
@@ -351,6 +378,7 @@ void BlockAST::Codegen() const
 
 void IfStatementAST::Codegen() const
 {
+    EmitLocation();
     auto conditionCodegenned = condition->Codegen();
     if (conditionCodegenned->getType()->getTypeID() != llvm::Type::TypeID::IntegerTyID)
         g_context->Error(condition->location, "Condition must be an integer, this is probably a typechecker bug");
@@ -391,6 +419,7 @@ void IfStatementAST::Codegen() const
 
 void WhileStatementAST::Codegen() const
 {
+    EmitLocation();
     auto parentFunction = g_context->builder->GetInsertBlock()->getParent();
 
     auto loopCond = llvm::BasicBlock::Create(*g_context->llvmContext, "while.cond", parentFunction);
@@ -420,6 +449,7 @@ void WhileStatementAST::Codegen() const
 
 void VariableDefinitionAST::Codegen() const
 {
+    EmitLocation();
     if (isInsideFunction)
     {
         // FIXME: Do something about local constants
@@ -432,6 +462,13 @@ void VariableDefinitionAST::Codegen() const
         else
             blockStack.back()[name] = MakeRef<VariableInfoAlloca>(functionBeginBuilder.CreateAlloca(type->GetType(), size, name));
 
+        if (g_context->debug)
+        {
+            auto file = location.GetFile().debugFile;
+            auto debugLocalVariable = g_context->debugBuilder->createAutoVariable(GetCurrentScope(), name, file, location.line, type->GetDebugType(), true);
+            g_context->debugBuilder->insertDeclare(FindVariable(name, location)->GetValue(), debugLocalVariable, g_context->debugBuilder->createExpression(), llvm::DILocation::get(parentFunction->getContext(), location.line, 0, GetCurrentScope()), functionBeginBuilder.GetInsertBlock()); // FIXME: Column
+        }
+
         if (initialValue != nullptr)
             g_context->builder->CreateStore(initialValue->Codegen(), FindVariable(name, location)->GetValue());
     }
@@ -440,24 +477,51 @@ void VariableDefinitionAST::Codegen() const
         assert(initialValue);
         auto global = new llvm::GlobalVariable(*g_context->module, type->GetType(), isConst, llvm::GlobalValue::ExternalLinkage, initialValue->EvaluateAsConstant(), name);
         blockStack.back()[name] = MakeRef<VariableInfoGlobal>(global);
+
+        if (g_context->debug)
+        {
+            auto file = location.GetFile().debugFile;
+            auto debug = g_context->debugBuilder->createGlobalVariableExpression(GetCurrentScope(), name, "", file, location.line, type->GetDebugType(), false);
+        }
     }
 }
 
 llvm::Function* FunctionAST::Codegen() const
 {
+    EmitLocation();
     assert(!isInsideFunction);
 
     isInsideFunction = true;
 
     std::vector<llvm::Type*> llvmParams;
+    std::vector<llvm::Metadata*> debugTypes;
+
+    if (g_context->debug)
+        debugTypes.push_back(returnType->GetDebugType());
+
     for (const auto& param : params)
+    {
         llvmParams.push_back(param.type->GetType());
+        if (g_context->debug)
+            debugTypes.push_back(param.type->GetDebugType());
+    }
 
     auto functionType = llvm::FunctionType::get(returnType->GetType(), llvmParams, false);
     auto function = llvm::Function::Create(functionType, llvm::Function::ExternalLinkage, name, g_context->module.get());
 
     for (auto& param : function->args())
         param.setName(params[param.getArgNo()].name);
+
+    llvm::DISubprogram* debugFunction;
+    if (g_context->debug)
+    {
+        auto file = location.GetFile().debugFile;
+        debugFunction = g_context->debugBuilder->createFunction(file, name, "", file, location.line, g_context->debugBuilder->createSubroutineType(g_context->debugBuilder->getOrCreateTypeArray(debugTypes)), 0, llvm::DINode::FlagPrototyped, llvm::DISubprogram::SPFlagDefinition);
+        function->setSubprogram(debugFunction);
+
+        debugScopes.push_back(debugFunction);
+        g_context->builder->SetCurrentDebugLocation(llvm::DebugLoc());
+    }
 
     if (block != nullptr)
     {
@@ -471,6 +535,13 @@ llvm::Function* FunctionAST::Codegen() const
             // FIXME: Array support
             auto alloca = g_context->builder->CreateAlloca(arg.getType(), 0, arg.getName());
             blockStack.back()[arg.getName().str()] = MakeRef<VariableInfoAlloca>(alloca);
+
+            if (g_context->debug)
+            {
+                auto debugLocalVariable = g_context->debugBuilder->createParameterVariable(debugFunction, arg.getName(), arg.getArgNo() + 1, location.GetFile().debugFile, location.line, params.at(arg.getArgNo()).type->GetDebugType(), true);
+                g_context->debugBuilder->insertDeclare(alloca, debugLocalVariable, g_context->debugBuilder->createExpression(), llvm::DILocation::get(debugFunction->getContext(), location.line, 0, debugFunction), g_context->builder->GetInsertBlock()); // FIXME: Column
+            }
+
             g_context->builder->CreateStore(&arg, alloca);
         }
 
@@ -487,6 +558,9 @@ llvm::Function* FunctionAST::Codegen() const
         blockStack.pop_back();
     }
 
+    if (g_context->debug)
+        debugScopes.pop_back();
+
     isInsideFunction = false;
 
     return function;
@@ -501,6 +575,9 @@ void ParsedFile::Codegen() const
 
     for (const auto& function : functions)
         function->Codegen();
+
+    if (g_context->debug)
+        g_context->debugBuilder->finalize();
 
     llvm::verifyModule(*g_context->module);
 

@@ -12,7 +12,7 @@ TokenStream CreateTokenStream(uint32_t fileID)
     {
         if (index >= file.size())
         {
-            tokens.push_back({ .type = TokenType::Eof });
+            tokens.push_back({ .type = TokenType::Eof, .location = { fileID, index } });
             break;
         }
 
@@ -22,7 +22,7 @@ TokenStream CreateTokenStream(uint32_t fileID)
             index++;
             if (index >= file.size())
             {
-                tokens.push_back({ .type = TokenType::Eof });
+                tokens.push_back({ .type = TokenType::Eof, .location = { fileID, index } });
                 reachedEndOfLine = true;
                 break;
             }
@@ -111,7 +111,10 @@ TokenStream CreateTokenStream(uint32_t fileID)
                 index++;
                 while (!(file[index] == '*' && file[index + 1] == '/') && index + 1 < file.size())
                     index++;
-                index += 2;
+                if (index < file.size())
+                    index++;
+                if (index < file.size())
+                    index++;
                 continue;
             }
             tokens.push_back({ .type = TokenType::Slash, .location = { fileID, index - 1 } });

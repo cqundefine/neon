@@ -73,20 +73,37 @@ Ref<ParsedFile> Parser::Parse()
 
             std::vector<llvm::Type*> llvmMembers;
             std::map<std::string, Ref<Type>> rawMembers;
+            std::vector<llvm::Metadata*> debugTypes;
             for (auto& [name, type] : members)
             {
                 type.first->Typecheck(type.second);
                 llvmMembers.push_back(type.first->GetType());
                 rawMembers[name] = type.first;
+                if (g_context->debug)
+                    debugTypes.push_back(type.first->GetDebugType());
             }
 
             if (llvmMembers.empty())
+            {
                 llvmMembers.push_back(llvm::Type::getInt8Ty(*g_context->llvmContext));
+                if (g_context->debug)
+                    debugTypes.push_back(g_context->debugBuilder->createBasicType("uint8", 8, llvm::dwarf::DW_ATE_unsigned));
+            }
+
+            auto llvmType = llvm::StructType::create(llvmMembers, nameToken.stringValue);
+
+            llvm::DICompositeType* debugType = nullptr;
+            if (g_context->debug)
+            {
+                auto file = nameToken.location.GetFile().debugFile;
+                debugType = g_context->debugBuilder->createStructType(file, nameToken.stringValue, file, nameToken.location.line, g_context->module->getDataLayout().getTypeAllocSizeInBits(llvmType), 0, llvm::DINode::FlagPrototyped, nullptr, g_context->debugBuilder->getOrCreateArray(debugTypes));
+            }
 
             g_context->structs[nameToken.stringValue] = {
                 .name = nameToken.stringValue,
                 .members = rawMembers,
-                .llvmType = llvm::StructType::create(llvmMembers, nameToken.stringValue)
+                .llvmType = llvmType,
+                .debugType = debugType
             };
         }
         else if (token.type == TokenType::Var || token.type == TokenType::Const)

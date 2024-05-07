@@ -47,6 +47,7 @@ COMPILER_CRASH = f"{ERROR_COLOR}FAILURE (compiler crashed){RESET_COLOR}"
 
 NON_OPTIMIZED = "non-optimized"
 OPTIMIZED = "optimized"
+DEBUG_SYMBOLS = "with debug symbols"
 
 target = "./tests/"
 output_target = "./tests_build/"
@@ -223,6 +224,7 @@ def run_test_for_file(file_path: str, stats: RunStats = RunStats()):
 
     run_pass(file_path, tc, stats, [], NON_OPTIMIZED)
     run_pass(file_path, tc, stats, ["-O"], OPTIMIZED)
+    run_pass(file_path, tc, stats, ["-g"], DEBUG_SYMBOLS)
     # TODO: Test validity of the IR with llc
 
 def run_test_for_subfolder(folder: str, stats: RunStats):

@@ -3,6 +3,7 @@
 #include <fstream>
 #include <memory>
 #include <sstream>
+#include <llvm/IR/DebugInfoMetadata.h>
 
 template <typename T>
 using Own = std::unique_ptr<T>;
@@ -26,12 +27,29 @@ constexpr Ref<T> StaticRefCast(const Ref<Base>& base)
     return std::static_pointer_cast<T>(base);
 }
 
+struct FileInfo
+{
+    std::string filename;
+    std::string content;
+    llvm::DIFile* debugFile;
+};
+
 struct Location
 {
     uint32_t fileID;
-    size_t index;
-};
+    uint32_t line;
+    uint32_t column;
 
-constexpr Location LocationNone = { UINT32_MAX, 0 };
+    constexpr Location()
+    {
+        fileID = UINT32_MAX;
+        line = 0;
+        column = 0;
+    }
+
+    Location(uint32_t fileID, size_t index);
+
+    FileInfo GetFile() const;
+};
 
 std::string ReadFile(const std::string& filename);

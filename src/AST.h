@@ -41,6 +41,8 @@ struct AST
         : location(location)
     {
     }
+
+    void EmitLocation() const;
 };
 
 struct ExpressionAST : public AST

@@ -23,12 +23,18 @@ int main(int argc, char** argv)
         .help("run executable")
         .flag();
 
-    program.add_argument("-O")
+    program.add_argument("--target")
+        .help("target triple");
+
+    auto& optimizeDebugGroup = program.add_mutually_exclusive_group();
+
+    optimizeDebugGroup.add_argument("-O")
         .help("optimize")
         .flag();
 
-    program.add_argument("--target")
-        .help("target triple");
+    optimizeDebugGroup.add_argument("-g")
+        .help("add debug information")
+        .flag();
 
     auto& dumpGroup = program.add_mutually_exclusive_group();
 
@@ -59,9 +65,7 @@ int main(int argc, char** argv)
         exit(1);
     }
 
-    g_context = MakeRef<Context>(program.get("filename"), program.present("--target"));
-
-    g_context->optimize = program["-O"] == true;
+    g_context = MakeRef<Context>(program.get("filename"), program.present("--target"), program["-O"] == true, program["-g"] == true);
 
     auto tokenStream = CreateTokenStream(g_context->rootFileID);
     tokenStream = Preprocess(std::move(tokenStream));

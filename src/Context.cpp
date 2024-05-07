@@ -40,37 +40,46 @@ uint32_t lastFileID = 0;
         builder->CreateRet(syscall##N##Result);                                                                                                                                                         \
     }
 
-Context::Context(const std::string& baseFile, std::optional<std::string> passedTarget)
+Context::Context(const std::string& baseFile, std::optional<std::string> passedTarget, bool optimize, bool debug)
+    : optimize(optimize), debug(debug)
 {
-    rootFileID = LoadFile(baseFile);
-
     llvmContext = MakeOwn<llvm::LLVMContext>();
     module = MakeOwn<llvm::Module>(baseFile, *llvmContext);
     builder = MakeOwn<llvm::IRBuilder<>>(*llvmContext);
 
-    // Create new pass and analysis managers.
-    functionPassManager = MakeOwn<llvm::FunctionPassManager>();
-    loopAnalysisManager = MakeOwn<llvm::LoopAnalysisManager>();
-    functionAnalysisManager = MakeOwn<llvm::FunctionAnalysisManager>();
-    cgsccAnalysisManager = MakeOwn<llvm::CGSCCAnalysisManager>();
-    moduleAnalysisManager = MakeOwn<llvm::ModuleAnalysisManager>();
-    passInstrumentationCallbacks = MakeOwn<llvm::PassInstrumentationCallbacks>();
-    standardInstrumentations = MakeOwn<llvm::StandardInstrumentations>(*llvmContext, true);
-    standardInstrumentations->registerCallbacks(*passInstrumentationCallbacks, moduleAnalysisManager.get());
+    if (debug)
+        debugBuilder = MakeOwn<llvm::DIBuilder>(*module);
 
-    functionPassManager->addPass(llvm::PromotePass());
-    functionPassManager->addPass(llvm::DCEPass());
-    functionPassManager->addPass(llvm::InstCombinePass());
-    functionPassManager->addPass(llvm::ReassociatePass());
-    functionPassManager->addPass(llvm::GVNPass());
-    functionPassManager->addPass(llvm::SimplifyCFGPass());
+    rootFileID = LoadFile(baseFile);
 
-    llvm::PassBuilder passBuilder;
-    passBuilder.registerModuleAnalyses(*moduleAnalysisManager);
-    passBuilder.registerFunctionAnalyses(*functionAnalysisManager);
-    passBuilder.crossRegisterProxies(*loopAnalysisManager, *functionAnalysisManager, *cgsccAnalysisManager, *moduleAnalysisManager);
+    if (debug)
+        debugCompileUnit = debugBuilder->createCompileUnit(llvm::dwarf::DW_LANG_C, debugBuilder->createFile(files.at(rootFileID).filename, "."), "Neon", false, "", 0);
 
-    auto targetTriple = passedTarget.has_value()  ? passedTarget.value() : llvm::sys::getDefaultTargetTriple();
+    if (optimize)
+    {
+        functionPassManager = MakeOwn<llvm::FunctionPassManager>();
+        loopAnalysisManager = MakeOwn<llvm::LoopAnalysisManager>();
+        functionAnalysisManager = MakeOwn<llvm::FunctionAnalysisManager>();
+        cgsccAnalysisManager = MakeOwn<llvm::CGSCCAnalysisManager>();
+        moduleAnalysisManager = MakeOwn<llvm::ModuleAnalysisManager>();
+        passInstrumentationCallbacks = MakeOwn<llvm::PassInstrumentationCallbacks>();
+        standardInstrumentations = MakeOwn<llvm::StandardInstrumentations>(*llvmContext, true);
+        standardInstrumentations->registerCallbacks(*passInstrumentationCallbacks, moduleAnalysisManager.get());
+
+        functionPassManager->addPass(llvm::PromotePass());
+        functionPassManager->addPass(llvm::DCEPass());
+        functionPassManager->addPass(llvm::InstCombinePass());
+        functionPassManager->addPass(llvm::ReassociatePass());
+        functionPassManager->addPass(llvm::GVNPass());
+        functionPassManager->addPass(llvm::SimplifyCFGPass());
+
+        llvm::PassBuilder passBuilder;
+        passBuilder.registerModuleAnalyses(*moduleAnalysisManager);
+        passBuilder.registerFunctionAnalyses(*functionAnalysisManager);
+        passBuilder.crossRegisterProxies(*loopAnalysisManager, *functionAnalysisManager, *cgsccAnalysisManager, *moduleAnalysisManager);
+    }
+
+    auto targetTriple = passedTarget.has_value() ? passedTarget.value() : llvm::sys::getDefaultTargetTriple();
 
     llvm::InitializeAllTargetInfos();
     llvm::InitializeAllTargets();
@@ -93,6 +102,12 @@ Context::Context(const std::string& baseFile, std::optional<std::string> passedT
     module->setTargetTriple(targetTriple);
 
     std::string arch = targetMachine->getTarget().getName();
+
+    if (targetMachine->getPointerSizeInBits(0) != 64)
+    {
+        fprintf(stderr, "Unsupported pointer size: %d!\n", targetMachine->getPointerSizeInBits(0));
+        exit(1);
+    }
 
     if (arch == "x86-64")
     {
@@ -131,20 +146,21 @@ uint32_t Context::LoadFile(const std::string& filename)
     }
 
     uint32_t fileID = lastFileID++;
-    files[fileID] = { filename, ReadFile(filename) };
+    auto debugFile = debug ? debugBuilder->createFile(filename, ".") : nullptr;
+    files[fileID] = { filename, ReadFile(filename), debugFile };
     return fileID;
 }
 
-std::pair<uint32_t, uint32_t> Context::LineColumnFromLocation(Location location) const
+std::pair<uint32_t, uint32_t> Context::LineColumnFromLocation(uint32_t fileID, size_t index) const
 {
-    assert(location.fileID != UINT32_MAX);
+    assert(fileID != UINT32_MAX);
 
     uint32_t line = 1;
     uint32_t column = 1;
 
-    for (uint32_t index = 0; index <= location.index; index++)
+    for (uint32_t i = 0; i <= index; i++)
     {
-        if (files.at(location.fileID).content[index] == '\n')
+        if (files.at(fileID).content[i] == '\n')
         {
             line++;
             column = 1;
@@ -162,8 +178,7 @@ std::pair<uint32_t, uint32_t> Context::LineColumnFromLocation(Location location)
 {
     if (location.fileID != UINT32_MAX)
     {
-        auto lineColumn = LineColumnFromLocation(location);
-        fprintf(stderr, "%s:%d:%d ", files.at(location.fileID).filename.c_str(), lineColumn.first, lineColumn.second);
+        fprintf(stderr, "%s:%d:%d ", location.GetFile().filename.c_str(), location.line, location.column);
     }
 
     va_list va;
@@ -196,10 +211,10 @@ void Context::Write(OutputFileType fileType, std::optional<std::string> outputLo
 
     if (!foundMain)
     {
-        g_context->Error(LocationNone, "No main function found");
+        Error({}, "No main function found");
     }
 
-    auto mainFile = files.at(0).filename;
+    auto mainFile = files.at(rootFileID).filename;
 
     auto baseFilename = mainFile.substr(mainFile.find_last_of("/\\") + 1);
     auto fileWithoutExtension = baseFilename.substr(0, baseFilename.find_last_of('.'));
@@ -229,13 +244,13 @@ void Context::Write(OutputFileType fileType, std::optional<std::string> outputLo
 
     llvm::legacy::PassManager pass;
 
-    if (g_context->targetMachine->addPassesToEmitFile(pass, outputStream, nullptr, fileType == OutputFileType::Assembly ? llvm::CodeGenFileType::AssemblyFile : llvm::CodeGenFileType::ObjectFile))
+    if (targetMachine->addPassesToEmitFile(pass, outputStream, nullptr, fileType == OutputFileType::Assembly ? llvm::CodeGenFileType::AssemblyFile : llvm::CodeGenFileType::ObjectFile))
     {
         fprintf(stderr, "This machine can't emit this file type");
         exit(1);
     }
 
-    pass.run(*g_context->module);
+    pass.run(*module);
     outputStream.flush();
 
     if (fileType == OutputFileType::Executable)

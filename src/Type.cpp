@@ -126,6 +126,35 @@ std::string VoidType::ReadableName() const
 }
 
 // --------------------------
+// GetDebugType
+// --------------------------
+
+llvm::DIType* IntegerType::GetDebugType() const
+{
+    return g_context->debugBuilder->createBasicType(ReadableName(), bits, isSigned ? llvm::dwarf::DW_ATE_signed : llvm::dwarf::DW_ATE_unsigned);
+}
+
+llvm::DIType* ArrayType::GetDebugType() const
+{
+    return g_context->debugBuilder->createArrayType(size, 0, arrayType->GetDebugType(), g_context->debugBuilder->getOrCreateArray(g_context->debugBuilder->getOrCreateSubrange(0, size)));
+}
+
+llvm::DIType* PointerType::GetDebugType() const
+{
+    return g_context->debugBuilder->createPointerType(underlayingType->GetDebugType(), 64);
+}
+
+llvm::DIType* StructType::GetDebugType() const
+{
+    return g_context->structs.at(name).debugType;
+}
+
+llvm::DIType* VoidType::GetDebugType() const
+{
+    return g_context->debugBuilder->createUnspecifiedType("void");
+}
+
+// --------------------------
 // Other
 // --------------------------
 
