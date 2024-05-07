@@ -155,6 +155,36 @@ llvm::DIType* VoidType::GetDebugType() const
 }
 
 // --------------------------
+// GetDefaultValue
+// --------------------------
+
+llvm::Constant* IntegerType::GetDefaultValue() const
+{
+    return llvm::ConstantInt::get(GetType(), llvm::APInt(bits, 0, isSigned));
+}
+
+llvm::Constant* ArrayType::GetDefaultValue() const
+{
+    return llvm::ConstantAggregateZero::get(GetType());
+}
+
+llvm::Constant* PointerType::GetDefaultValue() const
+{
+    return llvm::ConstantPointerNull::get(llvm::PointerType::get(underlayingType->GetType(), 0));
+}
+
+llvm::Constant* StructType::GetDefaultValue() const
+{
+    return llvm::ConstantPointerNull::get(llvm::PointerType::get(g_context->structs.at(name).llvmType, 0));
+}
+
+llvm::Constant* VoidType::GetDefaultValue() const
+{
+    fprintf(stderr, "COMPILER ERROR: Can't get default value for void type\n");
+    exit(1);
+}
+
+// --------------------------
 // Other
 // --------------------------
 

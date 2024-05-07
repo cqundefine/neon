@@ -26,6 +26,7 @@ struct Type
     virtual bool Equals(const Type& other) const = 0;
     virtual llvm::DIType* GetDebugType() const = 0;
     virtual void Typecheck(Location) const {};
+    virtual llvm::Constant* GetDefaultValue() const = 0;
 
     virtual std::string ReadableName() const = 0;
 
@@ -58,6 +59,7 @@ struct IntegerType : public Type
     virtual std::string Dump() const override;
     virtual bool Equals(const Type& other) const override;
     virtual llvm::DIType* GetDebugType() const override;
+    virtual llvm::Constant* GetDefaultValue() const override;
 
     virtual std::string ReadableName() const override;
 };
@@ -78,6 +80,7 @@ struct ArrayType : public Type
     virtual std::string Dump() const override;
     virtual bool Equals(const Type& other) const override;
     virtual llvm::DIType* GetDebugType() const override;
+    virtual llvm::Constant* GetDefaultValue() const override;
 
     virtual std::string ReadableName() const override;
 };
@@ -97,6 +100,7 @@ struct PointerType : public Type
     virtual bool Equals(const Type& other) const override;
     virtual llvm::DIType* GetDebugType() const override;
     virtual void Typecheck(Location location) const override { underlayingType->Typecheck(location); };
+    virtual llvm::Constant* GetDefaultValue() const override;
 
     virtual std::string ReadableName() const override;
 };
@@ -116,6 +120,7 @@ struct StructType : public Type
     virtual bool Equals(const Type& other) const override;
     virtual llvm::DIType* GetDebugType() const override;
     virtual void Typecheck(Location) const override;
+    virtual llvm::Constant* GetDefaultValue() const override;
 
     virtual std::string ReadableName() const override;
 
@@ -133,6 +138,7 @@ struct VoidType : public Type
     virtual std::string Dump() const override;
     virtual bool Equals(const Type& other) const override;
     virtual llvm::DIType* GetDebugType() const override;
+    virtual llvm::Constant* GetDefaultValue() const override;
 
     virtual std::string ReadableName() const override;
 };

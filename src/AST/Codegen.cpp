@@ -474,8 +474,7 @@ void VariableDefinitionAST::Codegen() const
     }
     else
     {
-        assert(initialValue);
-        auto global = new llvm::GlobalVariable(*g_context->module, type->GetType(), isConst, llvm::GlobalValue::ExternalLinkage, initialValue->EvaluateAsConstant(), name);
+        auto global = new llvm::GlobalVariable(*g_context->module, type->GetType(), isConst, llvm::GlobalValue::ExternalLinkage, initialValue ? initialValue->EvaluateAsConstant() : type->GetDefaultValue(), name);
         blockStack.back()[name] = MakeRef<VariableInfoGlobal>(global);
 
         if (g_context->debug)
