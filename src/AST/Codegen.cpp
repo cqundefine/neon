@@ -130,22 +130,26 @@ llvm::Value* BinaryExpressionAST::Codegen(bool usedAsStatement) const
     if (binaryOperation == BinaryOperation::Assignment)
     {
         // FIXME: This needs a rafactor
+        auto rhsCodegenned = rhs->Codegen();
+        if (lhs->GetType()->type == TypeEnum::Integer)
+            rhsCodegenned = g_context->builder->CreateIntCast(rhsCodegenned, lhs->GetType()->GetType(), StaticRefCast<IntegerType>(lhs->GetType())->isSigned, "intcast");
+
         if (lhs->type == ExpressionType::Variable)
         {
             auto variableLHS = StaticRefCast<VariableExpressionAST>(lhs);
-            g_context->builder->CreateStore(rhs->Codegen(), FindVariable(variableLHS->name, variableLHS->location)->GetValue());
+            g_context->builder->CreateStore(rhsCodegenned, FindVariable(variableLHS->name, variableLHS->location)->GetValue());
         }
         else if (lhs->type == ExpressionType::ArrayAccess)
         {
             auto arrayLHS = StaticRefCast<ArrayAccessExpressionAST>(lhs);
             auto var = FindVariable(arrayLHS->array->name, arrayLHS->array->location);
             auto gep = g_context->builder->CreateGEP(var->GetType(), var->GetValue(), arrayLHS->index->Codegen(), "gep");
-            g_context->builder->CreateStore(rhs->Codegen(), gep);
+            g_context->builder->CreateStore(rhsCodegenned, gep);
         }
         else if (lhs->type == ExpressionType::Dereference)
         {
             auto dereferenceLHS = StaticRefCast<DereferenceExpressionAST>(lhs);
-            g_context->builder->CreateStore(rhs->Codegen(), dereferenceLHS->pointer->Codegen());
+            g_context->builder->CreateStore(rhsCodegenned, dereferenceLHS->pointer->Codegen());
         }
         else if (lhs->type == ExpressionType::MemberAccess)
         {
@@ -168,13 +172,13 @@ llvm::Value* BinaryExpressionAST::Codegen(bool usedAsStatement) const
                 if (var->GetType()->getTypeID() == llvm::Type::TypeID::StructTyID)
                 {
                     auto gep = g_context->builder->CreateStructGEP(structType->GetUnderlayingType(), var->GetValue(), elementIndex, "gep");
-                    g_context->builder->CreateStore(rhs->Codegen(), gep);
+                    g_context->builder->CreateStore(rhsCodegenned, gep);
                 }
                 else if (var->GetType()->getTypeID() == llvm::Type::TypeID::PointerTyID)
                 {
                     auto load = g_context->builder->CreateLoad(var->GetType(), var->GetValue(), "load");
                     auto gep = g_context->builder->CreateStructGEP(structType->GetUnderlayingType(), load, elementIndex, "gep");
-                    g_context->builder->CreateStore(rhs->Codegen(), gep);
+                    g_context->builder->CreateStore(rhsCodegenned, gep);
                 }
                 else
                 {
@@ -470,7 +474,13 @@ void VariableDefinitionAST::Codegen() const
         }
 
         if (initialValue != nullptr)
-            g_context->builder->CreateStore(initialValue->Codegen(), FindVariable(name, location)->GetValue());
+        {
+            auto initialValueCodegenned = initialValue->Codegen();
+            if (type->type == TypeEnum::Integer)
+                initialValueCodegenned = g_context->builder->CreateIntCast(initialValueCodegenned, type->GetType(), StaticRefCast<IntegerType>(type)->isSigned, "intcast");
+
+            g_context->builder->CreateStore(initialValueCodegenned, FindVariable(name, location)->GetValue());
+        }
     }
     else
     {
