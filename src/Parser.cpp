@@ -80,7 +80,10 @@ Ref<ParsedFile> Parser::Parse()
                 llvmMembers.push_back(type.first->GetType());
                 rawMembers[name] = type.first;
                 if (g_context->debug)
-                    debugTypes.push_back(type.first->GetDebugType());
+                {
+                    auto file = nameToken.location.GetFile().debugFile;
+                    debugTypes.push_back(g_context->debugBuilder->createMemberType(file, name, file, nameToken.location.line, g_context->module->getDataLayout().getTypeAllocSizeInBits(type.first->GetType()), 0, 0, llvm::DINode::FlagZero, type.first->GetDebugType()));
+                }
             }
 
             if (llvmMembers.empty())
