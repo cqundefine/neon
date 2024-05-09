@@ -6,7 +6,7 @@ struct A
     b: uint8;
 }
 
-function modifyA(a: A): void
+function modifyA(a: A&): void
 {
     a.a = a.a + 1;
 }

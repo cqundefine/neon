@@ -530,6 +530,12 @@ llvm::Function* FunctionAST::Codegen() const
 
     auto functionType = llvm::FunctionType::get(returnType->GetType(), llvmParams, false);
     auto function = llvm::Function::Create(functionType, llvm::Function::ExternalLinkage, name, g_context->module.get());
+    for (auto& arg : function->args())
+    {
+        auto param = params[arg.getArgNo()];
+        if (param.type->type == TypeEnum::Struct && !param.type->isRef)
+            arg.addAttr(llvm::Attribute::getWithByValType(*g_context->llvmContext, StaticRefCast<StructType>(param.type)->GetUnderlayingType()));
+    }
 
     for (auto& param : function->args())
         param.setName(params[param.getArgNo()].name);

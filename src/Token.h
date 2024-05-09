@@ -34,6 +34,7 @@ enum class TokenType
     ExclamationMark,
     Dot,
     Hash,
+    Ampersand,
 
     // Keywords
     Function,

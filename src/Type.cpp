@@ -185,14 +185,46 @@ llvm::Constant* VoidType::GetDefaultValue() const
 }
 
 // --------------------------
-// Other
+// Typecheck
 // --------------------------
+
+void IntegerType::Typecheck(Location location) const
+{
+    if (isRef)
+        g_context->Error(location, "Can't use reference to integer type");
+}
+
+void ArrayType::Typecheck(Location location) const
+{
+    arrayType->Typecheck(location);
+    if (size == 0)
+        g_context->Error(location, "Array size can't be 0");
+    if (isRef)
+        g_context->Error(location, "Can't use reference to array type");
+}
+
+void PointerType::Typecheck(Location location) const
+{
+    underlayingType->Typecheck(location);
+    if (isRef)
+        g_context->Error(location, "Can't use reference to pointer type");
+}
 
 void StructType::Typecheck(Location location) const
 {
     if (g_context->structs.find(name) == g_context->structs.end())
         g_context->Error(location, "Can't find struct: %s", name.c_str());
 }
+
+void VoidType::Typecheck(Location location) const
+{
+    if (isRef)
+        g_context->Error(location, "Can't use reference to void type");
+}
+
+// --------------------------
+// Other
+// --------------------------
 
 llvm::Type* StructType::GetUnderlayingType() const
 {

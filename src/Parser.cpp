@@ -481,6 +481,10 @@ std::pair<Ref<Type>, Location> Parser::ParseType(bool allowVoid)
         }
         m_stream.PreviousToken();
     }
+    else if (modifier.type == TokenType::Ampersand)
+    {
+        type->isRef = true;
+    }
     else if (modifier.type == TokenType::LSquareBracket)
     {
         auto size = m_stream.NextToken();
