@@ -183,9 +183,9 @@ struct CastExpressionAST : public ExpressionAST
 struct ArrayAccessExpressionAST : public ExpressionAST
 {
     Ref<VariableExpressionAST> array;
-    Ref<NumberExpressionAST> index;
+    Ref<ExpressionAST> index;
 
-    inline ArrayAccessExpressionAST(Location location, Ref<VariableExpressionAST> array, Ref<NumberExpressionAST> index)
+    inline ArrayAccessExpressionAST(Location location, Ref<VariableExpressionAST> array, Ref<ExpressionAST> index)
         : ExpressionAST(location, ExpressionType::ArrayAccess)
         , array(array)
         , index(index)

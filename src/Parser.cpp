@@ -379,10 +379,8 @@ Ref<ExpressionAST> Parser::ParseBarePrimary()
             if (second.type == TokenType::LSquareBracket)
             {
                 auto index = ParsePrimary();
-                if (index->type != ExpressionType::Number)
-                    g_context->Error(index->location, "Array index must be a number");
                 ExpectToken(TokenType::RSquareBracket);
-                return MakeRef<ArrayAccessExpressionAST>(second.location, var, std::static_pointer_cast<NumberExpressionAST>(index));
+                return MakeRef<ArrayAccessExpressionAST>(second.location, var, index);
             }
             m_stream.PreviousToken();
             return var;

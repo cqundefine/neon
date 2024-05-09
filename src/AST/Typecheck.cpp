@@ -99,6 +99,9 @@ void ArrayAccessExpressionAST::Typecheck() const
 {
     array->Typecheck();
     index->Typecheck();
+
+    if (index->GetType()->type != TypeEnum::Integer)
+        g_context->Error(location, "Array index must be an integer");
 }
 
 void DereferenceExpressionAST::Typecheck() const
