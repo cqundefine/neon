@@ -298,8 +298,21 @@ llvm::Value* ArrayAccessExpressionAST::Codegen(bool) const
 {
     EmitLocation();
     auto var = FindVariable(array->name, location);
-    auto gep = g_context->builder->CreateGEP(var->GetType(), var->GetValue(), index->Codegen(), "gep");
-    return g_context->builder->CreateLoad(StaticRefCast<ArrayType>(array->GetType())->arrayType->GetType(), gep, array->name);
+    if (array->GetType()->type == TypeEnum::Array)
+    {
+        auto gep = g_context->builder->CreateGEP(var->GetType(), var->GetValue(), index->Codegen(), "gep");
+        return g_context->builder->CreateLoad(GetType()->GetType(), gep, array->name);
+    }
+    else if (array->GetType()->type == TypeEnum::Pointer)
+    {
+        auto load = g_context->builder->CreateLoad(var->GetType(), var->GetValue(), "load");
+        auto gep = g_context->builder->CreateGEP(load->getType(), load, index->Codegen(), "gep");
+        return g_context->builder->CreateLoad(GetType()->GetType(), gep, array->name);
+    }
+    else
+    {
+        assert(false);
+    }
 }
 
 llvm::Value* DereferenceExpressionAST::Codegen(bool) const

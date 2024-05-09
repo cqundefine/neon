@@ -195,7 +195,15 @@ struct ArrayAccessExpressionAST : public ExpressionAST
     virtual void Dump(uint32_t indentCount) const override;
     virtual llvm::Value* Codegen(bool usedAsStatement = false) const override;
     virtual void Typecheck() const override;
-    virtual inline Ref<Type> GetType() const override { return StaticRefCast<ArrayType>(array->type)->arrayType; }
+    virtual inline Ref<Type> GetType() const override
+    {
+        if (array->type->type == TypeEnum::Array)
+            return StaticRefCast<ArrayType>(array->type)->arrayType;
+        else if (array->type->type == TypeEnum::Pointer)
+            return StaticRefCast<PointerType>(array->type)->underlayingType;
+        else
+            assert(false);
+    }
 };
 
 struct DereferenceExpressionAST : public ExpressionAST
