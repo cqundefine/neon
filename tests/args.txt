@@ -1,0 +1,16 @@
+:i builds 1
+:i argc 2
+:b arg0 3
+abc
+:b arg1 3
+def
+:b stdin 0
+
+:i returncode 0
+:b stdout 27
+./tests_build/args
+abc
+def
+
+:b stderr 0
+
