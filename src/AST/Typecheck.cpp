@@ -223,6 +223,18 @@ void FunctionAST::Typecheck() const
         .returnType = returnType
     };
 
+    if (name == "main")
+    {
+        if (returnType->type != TypeEnum::Integer)
+            g_context->Error(location, "Main function must return an integer");
+
+        if (params.size() == 2 && (params[0].type->type != TypeEnum::Integer || params[1].type->type != TypeEnum::Pointer))
+            g_context->Error(location, "Invalid main function parameters");
+
+        if (params.size() != 0 && params.size() != 2)
+            g_context->Error(location, "Main function must have no parameters or argc and argv");
+    }
+
     if (block != nullptr)
     {
         block->Typecheck();
