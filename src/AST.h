@@ -60,6 +60,7 @@ struct ExpressionAST : public AST
     virtual llvm::Value* RawCodegen() const { return Codegen(); }
     virtual void Typecheck() const = 0;
     virtual Ref<Type> GetType() const = 0;
+    virtual void DCE() const = 0;
     virtual llvm::Constant* EvaluateAsConstant() const { g_context->Error(location, "Expression is not constant"); }
 };
 
@@ -80,6 +81,7 @@ struct NumberExpressionAST : public ExpressionAST
     virtual void Dump(uint32_t indentCount) const override;
     virtual llvm::Value* Codegen(bool usedAsStatement = false) const override;
     virtual void Typecheck() const override;
+    virtual void DCE() const override;
     virtual inline Ref<Type> GetType() const override { return type; }
     virtual llvm::Constant* EvaluateAsConstant() const override;
 };
@@ -101,6 +103,7 @@ struct VariableExpressionAST : public ExpressionAST
     virtual llvm::Value* Codegen(bool usedAsStatement = false) const override;
     virtual llvm::Value* RawCodegen() const override;
     virtual void Typecheck() const override;
+    virtual void DCE() const override;
     virtual inline Ref<Type> GetType() const override { return type; }
 };
 
@@ -118,6 +121,7 @@ struct StringLiteralAST : public ExpressionAST
     virtual llvm::Value* Codegen(bool usedAsStatement = false) const override;
     virtual void Typecheck() const override;
     virtual inline Ref<Type> GetType() const override { return MakeRef<StructType>("string"); }
+    virtual void DCE() const override;
     virtual llvm::Constant* EvaluateAsConstant() const override;
 };
 
@@ -138,6 +142,7 @@ struct BinaryExpressionAST : public ExpressionAST
     virtual void Dump(uint32_t indentCount) const override;
     virtual llvm::Value* Codegen(bool usedAsStatement = false) const override;
     virtual void Typecheck() const override;
+    virtual void DCE() const override;
     virtual inline Ref<Type> GetType() const override { return lhs->GetType(); }
 };
 
@@ -159,6 +164,7 @@ struct CallExpressionAST : public ExpressionAST
     virtual void Dump(uint32_t indentCount) const override;
     virtual llvm::Value* Codegen(bool usedAsStatement = false) const override;
     virtual void Typecheck() const override;
+    virtual void DCE() const override;
     virtual inline Ref<Type> GetType() const override { return returnedType; }
 };
 
@@ -177,6 +183,7 @@ struct CastExpressionAST : public ExpressionAST
     virtual void Dump(uint32_t indentCount) const override;
     virtual llvm::Value* Codegen(bool usedAsStatement = false) const override;
     virtual void Typecheck() const override;
+    virtual void DCE() const override;
     virtual inline Ref<Type> GetType() const override { return castedTo; }
 };
 
@@ -195,6 +202,8 @@ struct ArrayAccessExpressionAST : public ExpressionAST
     virtual void Dump(uint32_t indentCount) const override;
     virtual llvm::Value* Codegen(bool usedAsStatement = false) const override;
     virtual void Typecheck() const override;
+    virtual void DCE() const override;
+
     virtual inline Ref<Type> GetType() const override
     {
         if (array->type->type == TypeEnum::Array)
@@ -219,6 +228,8 @@ struct DereferenceExpressionAST : public ExpressionAST
     virtual void Dump(uint32_t indentCount) const override;
     virtual llvm::Value* Codegen(bool usedAsStatement = false) const override;
     virtual void Typecheck() const override;
+    virtual void DCE() const override;
+
     virtual inline Ref<Type> GetType() const override
     {
         // This should get cought by the typechecker
@@ -242,6 +253,7 @@ struct MemberAccessExpressionAST : public ExpressionAST
     virtual void Dump(uint32_t indentCount) const override;
     virtual llvm::Value* Codegen(bool usedAsStatement = false) const override;
     virtual void Typecheck() const override;
+    virtual void DCE() const override;
     virtual inline Ref<Type> GetType() const override
     {
         assert(object->GetType()->type == TypeEnum::Struct);
@@ -262,6 +274,7 @@ struct StatementAST : public AST
     virtual void Dump(uint32_t indentCount) const = 0;
     virtual void Codegen() const = 0;
     virtual void Typecheck() const = 0;
+    virtual void DCE() const = 0;
 };
 
 struct ReturnStatementAST : public StatementAST
@@ -280,6 +293,7 @@ struct ReturnStatementAST : public StatementAST
     virtual void Dump(uint32_t indentCount) const override;
     virtual void Codegen() const override;
     virtual void Typecheck() const override;
+    virtual void DCE() const override;
 };
 
 struct BlockAST : public AST
@@ -295,6 +309,7 @@ struct BlockAST : public AST
     void Dump(uint32_t indentCount) const;
     void Codegen() const;
     void Typecheck() const;
+    void DCE() const;
 };
 
 struct IfStatementAST : public StatementAST
@@ -314,6 +329,7 @@ struct IfStatementAST : public StatementAST
     virtual void Dump(uint32_t indentCount) const override;
     virtual void Codegen() const override;
     virtual void Typecheck() const override;
+    virtual void DCE() const override;
 };
 
 struct WhileStatementAST : public StatementAST
@@ -331,6 +347,7 @@ struct WhileStatementAST : public StatementAST
     virtual void Dump(uint32_t indentCount) const override;
     virtual void Codegen() const override;
     virtual void Typecheck() const override;
+    virtual void DCE() const override;
 };
 
 struct VariableDefinitionAST : public StatementAST
@@ -339,6 +356,8 @@ struct VariableDefinitionAST : public StatementAST
     Ref<Type> type;
     bool isConst;
     Ref<ExpressionAST> initialValue;
+
+    bool used = false;
 
     inline VariableDefinitionAST(Location location, const std::string& name, Ref<Type> type, bool isConst, Ref<ExpressionAST> initialValue)
         : StatementAST(location, StatementType::VariableDefinition)
@@ -352,6 +371,7 @@ struct VariableDefinitionAST : public StatementAST
     virtual void Dump(uint32_t indentCount) const override;
     virtual void Codegen() const override;
     virtual void Typecheck() const override;
+    virtual void DCE() const override;
 };
 
 struct FunctionAST : public AST
@@ -367,6 +387,8 @@ struct FunctionAST : public AST
     Ref<Type> returnType;
     Ref<BlockAST> block;
 
+    bool used = false;
+
     inline FunctionAST(Location location, const std::string& name, std::vector<Param> params, Ref<Type> returnType, Ref<BlockAST> block)
         : AST(location)
         , name(name)
@@ -379,6 +401,7 @@ struct FunctionAST : public AST
     void Dump(uint32_t indentCount) const;
     llvm::Function* Codegen() const;
     void Typecheck() const;
+    void DCE() const;
 };
 
 struct ParsedFile
@@ -392,7 +415,13 @@ struct ParsedFile
     {
     }
 
+    Ref<FunctionAST> FindFunction(const std::string& name) const;
+    Ref<VariableDefinitionAST> FindGlobalVariable(const std::string& name) const;
+
     void Dump(uint32_t indentCount = 0) const;
     void Codegen() const;
     void Typecheck() const;
+    void DCE();
 };
+
+extern Ref<ParsedFile> g_parsedFile;

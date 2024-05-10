@@ -51,10 +51,14 @@ struct Context
 
     std::vector<std::string> defines;
 
+    void CreateSyscall(uint32_t number, std::string mnemonic, std::string returnRegister, std::string registers);
+
     uint32_t LoadFile(const std::string& filename);
 
     std::pair<uint32_t, uint32_t> LineColumnFromLocation(uint32_t fileID, size_t index) const;
     [[noreturn]] void Error(Location location, const char* fmt, ...) const;
+
+    void Finalize();
 
     enum class OutputFileType
     {

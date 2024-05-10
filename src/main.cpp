@@ -77,16 +77,20 @@ int main(int argc, char** argv)
     }
 
     Parser parser(std::move(tokenStream));
-    auto parsedFile = parser.Parse();
-    parsedFile->Typecheck();
+    g_parsedFile = parser.Parse();
+    g_parsedFile->Typecheck();
+    g_parsedFile->DCE();
 
     if (program["--dump-ast"] == true)
     {
-        parsedFile->Dump();
+        g_parsedFile->Dump();
         return 0;
     }
 
-    parsedFile->Codegen();
+    g_parsedFile->Codegen();
+
+    g_context->Finalize();
+
     if (program["--dump-ir"] == true)
         g_context->module->print(llvm::outs(), nullptr);
     else if (program["--dump-asm"] == true)

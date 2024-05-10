@@ -2,6 +2,7 @@
 
 #include <filesystem>
 #include <llvm/IR/InlineAsm.h>
+#include <llvm/IR/Verifier.h>
 #include <llvm/MC/TargetRegistry.h>
 #include <llvm/Support/FileSystem.h>
 #include <llvm/Support/TargetSelect.h>
@@ -21,24 +22,6 @@
 Ref<Context> g_context;
 
 uint32_t lastFileID = 0;
-
-#define CREATE_SYSCALL(N, MNEMONIC, RET, REGS)                                                                                                                                                                         \
-    {                                                                                                                                                                                                   \
-        auto int64Type = llvm::Type::getInt64Ty(*llvmContext);                                                                                                                                          \
-        std::vector<llvm::Type*> syscall##N##Args {};                                                                                                                                                   \
-        for (uint32_t i = 0; i < N + 1; i++)                                                                                                                                                            \
-            syscall##N##Args.push_back(int64Type);                                                                                                                                                      \
-        auto syscall##N##Type = llvm::FunctionType::get(int64Type, syscall##N##Args, false);                                                                                                            \
-        auto syscall##N = llvm::Function::Create(syscall##N##Type, llvm::Function::LinkageTypes::ExternalLinkage, "syscall" #N, *module);                                                               \
-        std::vector<llvm::Value*> syscall##N##ArgsValues {};                                                                                                                                            \
-        for (auto& arg : syscall##N->args())                                                                                                                                                            \
-            syscall##N##ArgsValues.push_back(&arg);                                                                                                                                                     \
-        auto syscall##N##Block = llvm::BasicBlock::Create(*llvmContext, "entry", syscall##N);                                                                                                           \
-        builder->SetInsertPoint(syscall##N##Block);                                                                                                                                                     \
-        auto syscall##N##AsmCall = llvm::InlineAsm::get(syscall##N##Type, MNEMONIC, "=" RET "," REGS ",~{memory},~{dirflag},~{fpsr},~{flags}", true, true, llvm::InlineAsm::AsmDialect::AD_ATT, false); \
-        auto syscall##N##Result = builder->CreateCall(syscall##N##AsmCall, syscall##N##ArgsValues);                                                                                                     \
-        builder->CreateRet(syscall##N##Result);                                                                                                                                                         \
-    }
 
 Context::Context(const std::string& baseFile, std::optional<std::string> passedTarget, bool optimize, bool debug)
     : optimize(optimize), debug(debug)
@@ -111,29 +94,38 @@ Context::Context(const std::string& baseFile, std::optional<std::string> passedT
 
     if (arch == "x86-64")
     {
-        CREATE_SYSCALL(0, "syscall", "{ax}", "{ax}");
-        CREATE_SYSCALL(1, "syscall", "{ax}", "{ax},{di}");
-        CREATE_SYSCALL(2, "syscall", "{ax}", "{ax},{di},{si}");
-        CREATE_SYSCALL(3, "syscall", "{ax}", "{ax},{di},{si},{dx}");
-        CREATE_SYSCALL(4, "syscall", "{ax}", "{ax},{di},{si},{dx},{r10}");
-        CREATE_SYSCALL(5, "syscall", "{ax}", "{ax},{di},{si},{dx},{r10},{r8}");
-        CREATE_SYSCALL(6, "syscall", "{ax}", "{ax},{di},{si},{dx},{r10},{r8},{r9}");
         defines.push_back("X86_64");
     }
     else if (arch == "aarch64")
     {
-        CREATE_SYSCALL(0, "svc #0", "{x0}", "{x8}");
-        CREATE_SYSCALL(1, "svc #0", "{x0}", "{x8},{x0}");
-        CREATE_SYSCALL(2, "svc #0", "{x0}", "{x8},{x0},{x1}");
-        CREATE_SYSCALL(3, "svc #0", "{x0}", "{x8},{x0},{x1},{x2}");
-        CREATE_SYSCALL(4, "svc #0", "{x0}", "{x8},{x0},{x1},{x2},{x3}");
-        CREATE_SYSCALL(5, "svc #0", "{x0}", "{x8},{x0},{x1},{x2},{x3},{x4}");
-        CREATE_SYSCALL(6, "svc #0", "{x0}", "{x8},{x0},{x1},{x2},{x3},{x4},{x5}");
         defines.push_back("AArch64");
     }
     else
     {
         fprintf(stderr, "Unsupported architecture: %s, not enabling syscalls or preprocessor arch directives!\n", arch.c_str());
+    }
+}
+
+void Context::CreateSyscall(uint32_t number, std::string mnemonic, std::string returnRegister, std::string registers)
+{
+    if (auto function = module->getFunction(std::string("syscall") + std::to_string(number)))
+    {
+        std::vector<llvm::Value*> argsValues {};
+        for (auto& arg : function->args())
+            argsValues.push_back(&arg);
+
+        auto block = llvm::BasicBlock::Create(*llvmContext, "entry", function);
+        builder->SetInsertPoint(block);
+
+        auto inlineAsm = llvm::InlineAsm::get(function->getFunctionType(), mnemonic, std::string("=") + returnRegister + "," + registers + ",~{memory},~{dirflag},~{fpsr},~{flags}", true, true, llvm::InlineAsm::AsmDialect::AD_ATT, false);
+        auto result = builder->CreateCall(inlineAsm, argsValues);
+
+        builder->CreateRet(result);
+
+        llvm::verifyFunction(*function);
+
+        if (g_context->optimize)
+            g_context->functionPassManager->run(*function, *g_context->functionAnalysisManager);
     }
 }
 
@@ -190,6 +182,32 @@ std::pair<uint32_t, uint32_t> Context::LineColumnFromLocation(uint32_t fileID, s
     va_end(va);
 
     exit(1);
+}
+
+void Context::Finalize()
+{
+    std::string arch = targetMachine->getTarget().getName();
+
+    if (arch == "x86-64")
+    {
+        CreateSyscall(0, "syscall", "{ax}", "{ax}");
+        CreateSyscall(1, "syscall", "{ax}", "{ax},{di}");
+        CreateSyscall(2, "syscall", "{ax}", "{ax},{di},{si}");
+        CreateSyscall(3, "syscall", "{ax}", "{ax},{di},{si},{dx}");
+        CreateSyscall(4, "syscall", "{ax}", "{ax},{di},{si},{dx},{r10}");
+        CreateSyscall(5, "syscall", "{ax}", "{ax},{di},{si},{dx},{r10},{r8}");
+        CreateSyscall(6, "syscall", "{ax}", "{ax},{di},{si},{dx},{r10},{r8},{r9}");
+    }
+    else if (arch == "aarch64")
+    {
+        CreateSyscall(0, "svc #0", "{x0}", "{x8}");
+        CreateSyscall(1, "svc #0", "{x0}", "{x8},{x0}");
+        CreateSyscall(2, "svc #0", "{x0}", "{x8},{x0},{x1}");
+        CreateSyscall(3, "svc #0", "{x0}", "{x8},{x0},{x1},{x2}");
+        CreateSyscall(4, "svc #0", "{x0}", "{x8},{x0},{x1},{x2},{x3}");
+        CreateSyscall(5, "svc #0", "{x0}", "{x8},{x0},{x1},{x2},{x3},{x4}");
+        CreateSyscall(6, "svc #0", "{x0}", "{x8},{x0},{x1},{x2},{x3},{x4},{x5}");
+    }
 }
 
 void Context::Write(OutputFileType fileType, std::optional<std::string> outputLocation, bool run) const
