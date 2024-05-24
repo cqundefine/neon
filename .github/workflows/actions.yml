@@ -11,7 +11,7 @@ jobs:
       - name: install dependencies
         run: |
           sudo apt update
-          sudo apt purge -y llvm-12 llvm-13 llvm-14
+          sudo apt purge -y llvm-12 llvm-13 llvm-14 llvm-15
           sudo apt install -y gcc cmake ninja-build python3
           wget https://apt.llvm.org/llvm.sh
           chmod +x llvm.sh
