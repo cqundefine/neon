@@ -10,6 +10,7 @@
 #include <Type.h>
 #include <Utils.h>
 #include <map>
+#include <optional>
 
 struct Context
 {
