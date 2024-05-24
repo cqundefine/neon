@@ -21,6 +21,7 @@ static std::vector<std::map<std::string, VariableInfo>> blockStack;
 }
 
 static std::string typecheckCurrentFunction;
+static bool foundMain = false;
 
 struct TypecheckFunction
 {
@@ -228,6 +229,8 @@ void FunctionAST::Typecheck() const
 
     if (name == "main")
     {
+        foundMain = true;
+
         if (returnType->type != TypeEnum::Integer)
             g_context->Error(location, "Main function must return an integer");
 
@@ -280,6 +283,9 @@ void ParsedFile::Typecheck() const
 
     for (const auto& function : functions)
         function->Typecheck();
+
+    if (!foundMain)
+        g_context->Error({}, "No main function found");
 
     blockStack.pop_back();
 
