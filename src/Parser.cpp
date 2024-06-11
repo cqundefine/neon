@@ -490,7 +490,7 @@ std::pair<Ref<Type>, Location> Parser::ParseType(bool allowVoid)
         auto size = m_stream.NextToken();
         ExpectToBe(size, TokenType::Number);
         ExpectToken(TokenType::RSquareBracket);
-        return { MakeRef<ArrayType>(type, size.intValue) , typeToken.location };
+        return { MakeRef<ArrayType>(type, size.intValue), typeToken.location };
     }
     else
     {

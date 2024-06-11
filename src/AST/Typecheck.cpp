@@ -254,12 +254,11 @@ void FunctionAST::Typecheck() const
             auto lastStatement = block->statements[block->statements.size() - 1];
             if (!std::holds_alternative<Ref<StatementAST>>(lastStatement))
                 g_context->Error(location, "Last statement must be a return statement");
-            
+
             if (std::get<Ref<StatementAST>>(lastStatement)->type != StatementType::Return)
                 g_context->Error(location, "Last statement must be a return statement");
         }
     }
-
 
     blockStack.pop_back();
     typecheckCurrentFunction = "";

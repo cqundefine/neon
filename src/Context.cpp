@@ -24,7 +24,8 @@ Ref<Context> g_context;
 uint32_t lastFileID = 0;
 
 Context::Context(const std::string& baseFile, std::optional<std::string> passedTarget, bool optimize, bool debug)
-    : optimize(optimize), debug(debug)
+    : optimize(optimize)
+    , debug(debug)
 {
     llvmContext = MakeOwn<llvm::LLVMContext>();
     module = MakeOwn<llvm::Module>(baseFile, *llvmContext);
@@ -251,7 +252,7 @@ void Context::Write(OutputFileType fileType, std::optional<std::string> outputLo
     }
     else
     {
-        objectFilename = fileType == OutputFileType::Assembly ? fileWithoutExtension + ".asm" : fileWithoutExtension + ".o";;
+        objectFilename = fileType == OutputFileType::Assembly ? fileWithoutExtension + ".asm" : fileWithoutExtension + ".o";
     }
 
     std::error_code errorCode;

@@ -59,7 +59,7 @@ void BlockAST::DCE() const
     for (const auto& statement : statements)
     {
         if (std::holds_alternative<Ref<StatementAST>>(statement))
-            std::get<Ref<StatementAST>>(statement)->DCE();    
+            std::get<Ref<StatementAST>>(statement)->DCE();
         else
             std::get<Ref<ExpressionAST>>(statement)->DCE();
     }
