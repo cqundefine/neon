@@ -26,6 +26,10 @@ int main(int argc, char** argv)
     program.add_argument("--target")
         .help("target triple");
 
+    program.add_argument("--disable-dce")
+        .help("disable dead code elimination")
+        .flag();
+
     auto& optimizeDebugGroup = program.add_mutually_exclusive_group();
 
     optimizeDebugGroup.add_argument("-O")
@@ -79,7 +83,9 @@ int main(int argc, char** argv)
     Parser parser(std::move(tokenStream));
     g_parsedFile = parser.Parse();
     g_parsedFile->Typecheck();
-    g_parsedFile->DCE();
+
+    if (program["--disable-dce"] == false)
+        g_parsedFile->DCE();
 
     if (program["--dump-ast"] == true)
     {
