@@ -110,7 +110,7 @@ void DereferenceExpressionAST::Typecheck() const
     pointer->Typecheck();
 
     if (pointer->type->type != TypeEnum::Pointer)
-        g_context->Error(location, "Can't dereference non-pointer type: %s", pointer->type->Dump().c_str());
+        g_context->Error(location, "Can't dereference non-pointer type: %s", pointer->type->ReadableName().c_str());
 }
 
 void MemberAccessExpressionAST::Typecheck() const
@@ -144,7 +144,7 @@ void ReturnStatementAST::Typecheck() const
             StaticRefCast<NumberExpressionAST>(value)->AdjustType(StaticRefCast<IntegerType>(returnedType));
 
         if (*value->GetType() != *returnedType)
-            g_context->Error(location, "Wrong return type: %s, expected %s", value->GetType()->Dump().c_str(), returnedType->Dump().c_str());
+            g_context->Error(location, "Wrong return type: %s, expected %s", value->GetType()->ReadableName().c_str(), returnedType->ReadableName().c_str());
     }
 }
 
