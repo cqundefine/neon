@@ -220,6 +220,10 @@ TokenStream CreateTokenStream(uint32_t fileID)
                         g_context->Error({ fileID, index }, "Unknown escape char: %c", file[index]);
                     }
                 }
+                else if (c < 32)
+                {
+                    g_context->Error({ fileID, index }, "Unexpected control character: 0x%x", c);
+                }
                 else
                 {
                     value += c;
