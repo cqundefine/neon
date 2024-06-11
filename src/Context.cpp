@@ -114,6 +114,9 @@ void Context::CreateSyscall(uint32_t number, std::string mnemonic, std::string r
         for (auto& arg : function->args())
             argsValues.push_back(&arg);
 
+        if (g_context->debugBuilder)
+            g_context->builder->SetCurrentDebugLocation(llvm::DebugLoc());
+
         auto block = llvm::BasicBlock::Create(*llvmContext, "entry", function);
         builder->SetInsertPoint(block);
 
