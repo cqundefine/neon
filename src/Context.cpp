@@ -283,6 +283,6 @@ void Context::Write(OutputFileType fileType, std::optional<std::string> outputLo
         std::filesystem::remove(objectFilename);
 
         if (run)
-            system((std::string("./") + binaryFilename).c_str());
+            execl(binaryFilename.c_str(), binaryFilename.c_str(), nullptr);
     }
 }
