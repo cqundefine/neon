@@ -393,9 +393,7 @@ Ref<ExpressionAST> Parser::ParseBarePrimary()
     else if (first.type == TokenType::Asterisk)
     {
         auto child = ParsePrimary();
-        if (child->type != ExpressionType::Variable)
-            g_context->Error(first.location, "Can't dereference this expression");
-        return MakeRef<DereferenceExpressionAST>(first.location, StaticRefCast<VariableExpressionAST>(child));
+        return MakeRef<DereferenceExpressionAST>(first.location, child);
     }
     else if (first.type == TokenType::To)
     {

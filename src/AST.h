@@ -217,9 +217,9 @@ struct ArrayAccessExpressionAST : public ExpressionAST
 
 struct DereferenceExpressionAST : public ExpressionAST
 {
-    Ref<VariableExpressionAST> pointer;
+    Ref<ExpressionAST> pointer;
 
-    inline DereferenceExpressionAST(Location location, Ref<VariableExpressionAST> pointer)
+    inline DereferenceExpressionAST(Location location, Ref<ExpressionAST> pointer)
         : ExpressionAST(location, ExpressionType::Dereference)
         , pointer(pointer)
     {
@@ -233,8 +233,8 @@ struct DereferenceExpressionAST : public ExpressionAST
     virtual inline Ref<Type> GetType() const override
     {
         // This should get cought by the typechecker
-        assert(pointer->type->type == TypeEnum::Pointer);
-        return StaticRefCast<PointerType>(pointer->type)->underlayingType;
+        assert(pointer->GetType()->type == TypeEnum::Pointer);
+        return StaticRefCast<PointerType>(pointer->GetType())->underlayingType;
     }
 };
 
@@ -256,8 +256,12 @@ struct MemberAccessExpressionAST : public ExpressionAST
     virtual void DCE() const override;
     virtual inline Ref<Type> GetType() const override
     {
-        assert(object->GetType()->type == TypeEnum::Struct);
-        return g_context->structs.at(StaticRefCast<StructType>(object->GetType())->name).members[memberName];
+        if (object->GetType()->type == TypeEnum::Pointer)
+            return g_context->structs.at(StaticRefCast<StructType>(StaticRefCast<PointerType>(object->GetType())->underlayingType)->name).members[memberName];
+        else if (object->GetType()->type == TypeEnum::Struct)
+            return g_context->structs.at(StaticRefCast<StructType>(object->GetType())->name).members[memberName];
+        else
+            assert(false);
     }
 };
 

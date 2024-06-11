@@ -109,18 +109,33 @@ void DereferenceExpressionAST::Typecheck() const
 {
     pointer->Typecheck();
 
-    if (pointer->type->type != TypeEnum::Pointer)
-        g_context->Error(location, "Can't dereference non-pointer type: %s", pointer->type->ReadableName().c_str());
+    if (pointer->GetType()->type != TypeEnum::Pointer)
+        g_context->Error(location, "Can't dereference non-pointer type: %s", pointer->GetType()->ReadableName().c_str());
 }
 
 void MemberAccessExpressionAST::Typecheck() const
 {
     object->Typecheck();
 
-    if (object->GetType()->type != TypeEnum::Struct)
-        g_context->Error(location, "Can't access member of non-struct type: %s", object->GetType()->ReadableName().c_str());
+    Ref<StructType> structType;
 
-    auto structType = StaticRefCast<StructType>(object->GetType());
+    if (object->GetType()->type == TypeEnum::Struct)
+    {
+        structType = StaticRefCast<StructType>(object->GetType());
+    }
+    else if (object->GetType()->type == TypeEnum::Pointer)
+    {
+        auto pointerType = StaticRefCast<PointerType>(object->GetType());
+        if (pointerType->underlayingType->type == TypeEnum::Struct)
+            structType = StaticRefCast<StructType>(pointerType->underlayingType);
+        else
+            g_context->Error(location, "Can't access member of non-struct type: %s", pointerType->underlayingType->ReadableName().c_str());
+    }
+    else
+    {
+        g_context->Error(location, "Can't access member of non-struct type: %s", object->GetType()->ReadableName().c_str());
+    }
+
     for (const auto& [memberName, memberType] : g_context->structs[structType->name].members)
     {
         if (memberName == this->memberName)
@@ -130,6 +145,7 @@ void MemberAccessExpressionAST::Typecheck() const
     }
 
     g_context->Error(location, "Can't access member %s", memberName.c_str());
+
 }
 
 void ReturnStatementAST::Typecheck() const
@@ -221,6 +237,9 @@ void FunctionAST::Typecheck() const
     }
 
     returnType->Typecheck(location);
+
+    if (returnType->type == TypeEnum::Struct)
+        g_context->Error(location, "Returning structs is not supported yet");
 
     typecheckFunctions[name] = {
         .params = typecheckParams,

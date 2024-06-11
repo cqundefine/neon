@@ -154,8 +154,15 @@ llvm::Value* BinaryExpressionAST::Codegen(bool usedAsStatement) const
         else if (lhs->type == ExpressionType::MemberAccess)
         {
             auto memberAccessLHS = StaticRefCast<MemberAccessExpressionAST>(lhs);
-            assert(memberAccessLHS->object->GetType()->type == TypeEnum::Struct);
-            auto structType = StaticRefCast<StructType>(memberAccessLHS->object->GetType());
+            
+            Ref<StructType> structType;
+
+            if (memberAccessLHS->object->GetType()->type == TypeEnum::Pointer)
+                structType = StaticRefCast<StructType>(StaticRefCast<PointerType>(memberAccessLHS->object->GetType())->underlayingType);
+            else if (memberAccessLHS->object->GetType()->type == TypeEnum::Struct)
+                structType = StaticRefCast<StructType>(memberAccessLHS->object->GetType());
+            else
+                assert(false);
 
             uint32_t elementIndex = 0;
             for (const auto& [name, type] : g_context->structs[structType->name].members)
@@ -318,7 +325,7 @@ llvm::Value* ArrayAccessExpressionAST::Codegen(bool) const
 llvm::Value* DereferenceExpressionAST::Codegen(bool) const
 {
     EmitLocation();
-    return g_context->builder->CreateLoad(StaticRefCast<PointerType>(pointer->GetType())->underlayingType->GetType(), pointer->Codegen(), pointer->name);
+    return g_context->builder->CreateLoad(StaticRefCast<PointerType>(pointer->GetType())->underlayingType->GetType(), pointer->Codegen(), "deref");
 }
 
 llvm::Value* MemberAccessExpressionAST::Codegen(bool) const

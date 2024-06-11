@@ -9,7 +9,8 @@ if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     add_compile_options(-Wno-missing-template-keyword)
 endif()
 
-find_package(LLVM REQUIRED CONFIG)
+find_package(LLVM 18.1.4 REQUIRED CONFIG PATHS /opt/llvm-18.1.4-debug/)
+add_link_options("-Wl,-rpath=/opt/llvm-18.1.4-debug/lib")
 
 project(Neon)
 
