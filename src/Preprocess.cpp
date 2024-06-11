@@ -3,6 +3,8 @@
 
 static std::vector<uint32_t> g_includedFiles;
 
+TokenStream PreprocessSubfile(TokenStream stream);
+
 void IncludeFile(TokenStream& stream, const std::string& file)
 {
     uint32_t includedID = g_context->LoadFile("lib/" + file + ".ne");
@@ -11,7 +13,7 @@ void IncludeFile(TokenStream& stream, const std::string& file)
     g_includedFiles.push_back(includedID);
 
     auto includeStream = CreateTokenStream(includedID);
-    auto includePreprocessedStream = Preprocess(includeStream);
+    auto includePreprocessedStream = PreprocessSubfile(includeStream);
     stream.InsertStream(includePreprocessedStream);
 }
 
