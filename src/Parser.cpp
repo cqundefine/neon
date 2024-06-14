@@ -74,6 +74,7 @@ Ref<ParsedFile> Parser::Parse()
             std::vector<llvm::Type*> llvmMembers;
             std::map<std::string, Ref<Type>> rawMembers;
             std::vector<llvm::Metadata*> debugTypes;
+            uint64_t debugOffset = 0;
             for (auto& [name, type] : members)
             {
                 type.first->Typecheck(type.second);
@@ -82,7 +83,9 @@ Ref<ParsedFile> Parser::Parse()
                 if (g_context->debug)
                 {
                     auto file = nameToken.location.GetFile().debugFile;
-                    debugTypes.push_back(g_context->debugBuilder->createMemberType(file, name, file, nameToken.location.line, g_context->module->getDataLayout().getTypeAllocSizeInBits(type.first->GetType()), 0, 0, llvm::DINode::FlagZero, type.first->GetDebugType()));
+                    auto size = g_context->module->getDataLayout().getTypeAllocSizeInBits(type.first->GetType());
+                    debugTypes.push_back(g_context->debugBuilder->createMemberType(file, name, file, nameToken.location.line, size, 0, debugOffset, llvm::DINode::FlagZero, type.first->GetDebugType()));
+                    debugOffset += size;
                 }
             }
 
