@@ -76,7 +76,7 @@ Context::Context(const std::string& baseFile, std::optional<std::string> passedT
 
     if (!target)
     {
-        fprintf(stderr, "Error loading target %s: %s", targetTriple.c_str(), error.c_str());
+        fprintf(stderr, "Error loading target %s: %s\n", targetTriple.c_str(), error.c_str());
         exit(1);
     }
 
