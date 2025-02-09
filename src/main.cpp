@@ -42,6 +42,10 @@ int main(int argc, char** argv)
 
     auto& dumpGroup = program.add_mutually_exclusive_group();
 
+    dumpGroup.add_argument("--dump-tokens-before-preprocessor")
+        .help("dump tokens before preprocessor")
+        .flag();
+
     dumpGroup.add_argument("--dump-tokens")
         .help("dump tokens")
         .flag();
@@ -72,6 +76,13 @@ int main(int argc, char** argv)
     g_context = MakeRef<Context>(program.get("filename"), program.present("--target"), program["-O"] == true, program["-g"] == true);
 
     auto tokenStream = CreateTokenStream(g_context->rootFileID);
+
+    if (program["--dump-tokens-before-preprocessor"] == true)
+    {
+        tokenStream.Dump();
+        return 0;
+    }
+
     tokenStream = Preprocess(std::move(tokenStream));
 
     if (program["--dump-tokens"] == true)
