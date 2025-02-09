@@ -1,9 +1,8 @@
 #pragma once
 
-#include <fstream>
+#include <filesystem>
 #include <llvm/IR/DebugInfoMetadata.h>
 #include <memory>
-#include <sstream>
 
 template <typename T>
 using Own = std::unique_ptr<T>;
@@ -30,7 +29,7 @@ constexpr Ref<T> StaticRefCast(const Ref<Base>& base)
 struct FileInfo
 {
     std::string filename;
-    std::string content;
+    std::vector<char> content;
     llvm::DIFile* debugFile;
 };
 
@@ -52,4 +51,4 @@ struct Location
     FileInfo GetFile() const;
 };
 
-std::string ReadFile(const std::string& filename);
+std::vector<char> ReadFile(const std::filesystem::path& filename);
