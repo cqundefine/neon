@@ -14,5 +14,9 @@ extern function syscall6(syscall: uint64, arg1: uint64, arg2: uint64, arg3: uint
     const SYS_lseek: uint64 = 8;
 #endif
 #if AArch64
+    const SYS_read: uint64 = 63;
     const SYS_write: uint64 = 64;
+    const SYS_open: uint64 = 257;
+    const SYS_close: uint64 = 57;
+    const SYS_lseek: uint64 = 62;
 #endif

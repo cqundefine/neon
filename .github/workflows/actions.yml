@@ -5,17 +5,20 @@ on:
     branches: [ master ]
 jobs:
   tests-linux:
-    runs-on: ubuntu-22.04
+    strategy:
+      matrix:
+        arch: [x64, arm64]
+    runs-on: ${{ matrix.arch == 'x64' && 'ubuntu-24.04' || 'ubuntu-24.04-arm' }}
     steps:
       - uses: actions/checkout@v4
       - name: install dependencies
         run: |
           sudo apt update
-          sudo apt purge -y llvm-12 llvm-13 llvm-14 llvm-15
+          sudo apt purge -y llvm-16 llvm-17 llvm-18
           sudo apt install -y gcc cmake ninja-build python3
           wget https://apt.llvm.org/llvm.sh
           chmod +x llvm.sh
-          sudo ./llvm.sh 18
+          sudo ./llvm.sh 19
       - name: build the compiler
         run: |
           mkdir build
@@ -28,5 +31,5 @@ jobs:
       - name: upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: artifacts
+          name: artifacts-${{ matrix.arch }}
           path: build/Neon
