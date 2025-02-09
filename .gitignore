@@ -13,3 +13,4 @@ tests_build
 vscode/*.vsix
 
 .mypy_cache
+.cache
