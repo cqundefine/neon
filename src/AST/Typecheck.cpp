@@ -1,5 +1,7 @@
+#include "Type.h"
 #include <AST.h>
 #include <Context.h>
+#include <TypeCasts.h>
 #include <llvm/IR/Type.h>
 
 struct VariableInfo
@@ -30,38 +32,38 @@ struct TypecheckFunction
 };
 static std::map<std::string, TypecheckFunction> typecheckFunctions;
 
-void NumberExpressionAST::Typecheck() const
+void NumberExpressionAST::Typecheck()
 {
 }
 
-void VariableExpressionAST::Typecheck() const
+void VariableExpressionAST::Typecheck()
 {
     type = FindVariable(name, location).type;
 }
 
-void StringLiteralAST::Typecheck() const
+void StringLiteralAST::Typecheck()
 {
 }
 
-void BinaryExpressionAST::Typecheck() const
+void BinaryExpressionAST::Typecheck()
 {
     lhs->Typecheck();
     rhs->Typecheck();
 
-    if (rhs->type == ExpressionType::Number && lhs->GetType()->type == TypeEnum::Integer)
-        StaticRefCast<NumberExpressionAST>(rhs)->AdjustType(StaticRefCast<IntegerType>(lhs->GetType()));
+    if (is<NumberExpressionAST>(rhs) && is<IntegerType>(lhs->GetType()))
+        as<NumberExpressionAST>(rhs)->AdjustType(StaticRefCast<IntegerType>(lhs->GetType()));
 
     if (*lhs->GetType() != *rhs->GetType())
         g_context->Error(location, "Wrong binary operation: %s with type %s", lhs->GetType()->ReadableName().c_str(), rhs->GetType()->ReadableName().c_str());
 
-    if (binaryOperation == BinaryOperation::Assignment && lhs->type != ExpressionType::Variable && lhs->type != ExpressionType::ArrayAccess && lhs->type != ExpressionType::Dereference && lhs->type != ExpressionType::MemberAccess)
+    if (binaryOperation == BinaryOperation::Assignment && !is<VariableExpressionAST>(lhs) && !is<ArrayAccessExpressionAST>(lhs) && !is<DereferenceExpressionAST>(lhs) && !is<MemberAccessExpressionAST>(lhs))
         g_context->Error(location, "Can't assign to non-variable expression");
 
-    if (binaryOperation == BinaryOperation::Assignment && lhs->type == ExpressionType::Variable && FindVariable(StaticRefCast<VariableExpressionAST>(lhs)->name, lhs->location).isConst)
+    if (binaryOperation == BinaryOperation::Assignment && is<VariableExpressionAST>(lhs) && FindVariable(as<VariableExpressionAST>(lhs)->name, lhs->location).isConst)
         g_context->Error(location, "Can't assign to const variable");
 }
 
-void CallExpressionAST::Typecheck() const
+void CallExpressionAST::Typecheck()
 {
     if (typecheckFunctions.find(calleeName) == typecheckFunctions.end())
         g_context->Error(location, "Can't find function: %s", calleeName.c_str());
@@ -77,50 +79,50 @@ void CallExpressionAST::Typecheck() const
     {
         args[i]->Typecheck();
 
-        if (args[i]->type == ExpressionType::Number && function.params[i]->type == TypeEnum::Integer)
-            StaticRefCast<NumberExpressionAST>(args[i])->AdjustType(StaticRefCast<IntegerType>(function.params[i]));
+        if (is<NumberExpressionAST>(args[i]) && is<IntegerType>(function.params[i]))
+            as<NumberExpressionAST>(args[i])->AdjustType(StaticRefCast<IntegerType>(function.params[i]));
 
         if (*args[i]->GetType() != *function.params[i])
             g_context->Error(location, "Wrong argument type: %s, expected %s", args[i]->GetType()->ReadableName().c_str(), function.params[i]->ReadableName().c_str());
     }
 }
 
-void CastExpressionAST::Typecheck() const
+void CastExpressionAST::Typecheck()
 {
     child->Typecheck();
 
-    if (child->GetType()->type != TypeEnum::Integer && child->GetType()->type != TypeEnum::Pointer)
+    if (!is<IntegerType>(child->GetType()) && !is<PointerType>(child->GetType()))
         g_context->Error(location, "Can't cast from type %s", child->GetType()->ReadableName().c_str());
 
-    if (castedTo->type != TypeEnum::Integer && castedTo->type != TypeEnum::Pointer)
+    if (!is<IntegerType>(castedTo) && !is<PointerType>(castedTo))
         g_context->Error(location, "Can't cast to type %s", castedTo->ReadableName().c_str());
 }
 
-void ArrayAccessExpressionAST::Typecheck() const
+void ArrayAccessExpressionAST::Typecheck()
 {
     array->Typecheck();
     index->Typecheck();
 
-    if (index->GetType()->type != TypeEnum::Integer)
+    if (!is<IntegerType>(index->GetType()))
         g_context->Error(location, "Array index must be an integer");
 }
 
-void DereferenceExpressionAST::Typecheck() const
+void DereferenceExpressionAST::Typecheck()
 {
     pointer->Typecheck();
 
-    if (pointer->type->type != TypeEnum::Pointer)
+    if (!is<PointerType>(pointer->type))
         g_context->Error(location, "Can't dereference non-pointer type: %s", pointer->type->ReadableName().c_str());
 }
 
-void MemberAccessExpressionAST::Typecheck() const
+void MemberAccessExpressionAST::Typecheck()
 {
     object->Typecheck();
 
-    if (object->GetType()->type != TypeEnum::Struct)
+    if (!is<StructType>(object->GetType()))
         g_context->Error(location, "Can't access member of non-struct type: %s", object->GetType()->ReadableName().c_str());
 
-    auto structType = StaticRefCast<StructType>(object->GetType());
+    auto structType = as<StructType>(object->GetType());
     for (const auto& [memberName, memberType] : g_context->structs[structType->name].members)
     {
         if (memberName == this->memberName)
@@ -132,7 +134,7 @@ void MemberAccessExpressionAST::Typecheck() const
     g_context->Error(location, "Can't access member %s", memberName.c_str());
 }
 
-void ReturnStatementAST::Typecheck() const
+void ReturnStatementAST::Typecheck()
 {
     returnedType = FindVariable(typecheckCurrentFunction, location).type;
 
@@ -140,15 +142,15 @@ void ReturnStatementAST::Typecheck() const
     {
         value->Typecheck();
 
-        if (value->type == ExpressionType::Number && returnedType->type == TypeEnum::Integer)
-            StaticRefCast<NumberExpressionAST>(value)->AdjustType(StaticRefCast<IntegerType>(returnedType));
+        if (is<NumberExpressionAST>(value) && is<IntegerType>(returnedType))
+            as<NumberExpressionAST>(value)->AdjustType(StaticRefCast<IntegerType>(returnedType));
 
         if (*value->GetType() != *returnedType)
             g_context->Error(location, "Wrong return type: %s, expected %s", value->GetType()->ReadableName().c_str(), returnedType->ReadableName().c_str());
     }
 }
 
-void BlockAST::Typecheck() const
+void BlockAST::Typecheck()
 {
     blockStack.push_back({});
 
@@ -163,7 +165,7 @@ void BlockAST::Typecheck() const
     blockStack.pop_back();
 }
 
-void IfStatementAST::Typecheck() const
+void IfStatementAST::Typecheck()
 {
     condition->Typecheck();
     block->Typecheck();
@@ -171,13 +173,13 @@ void IfStatementAST::Typecheck() const
         elseBlock->Typecheck();
 }
 
-void WhileStatementAST::Typecheck() const
+void WhileStatementAST::Typecheck()
 {
     condition->Typecheck();
     block->Typecheck();
 }
 
-void VariableDefinitionAST::Typecheck() const
+void VariableDefinitionAST::Typecheck()
 {
     type->Typecheck(location);
 
@@ -191,16 +193,14 @@ void VariableDefinitionAST::Typecheck() const
         if (*initialValue->GetType() != *type)
             g_context->Error(location, "Wrong variable type: %s, expected %s", initialValue->GetType()->ReadableName().c_str(), type->ReadableName().c_str());
 
-        if (initialValue->type == ExpressionType::Number)
-        {
-            StaticRefCast<NumberExpressionAST>(initialValue)->AdjustType(StaticRefCast<IntegerType>(type));
-        }
+        if (auto* number = as_if<NumberExpressionAST>(initialValue))
+            number->AdjustType(StaticRefCast<IntegerType>(type));
     }
 
     blockStack.back()[name] = { type, isConst };
 }
 
-void FunctionAST::Typecheck() const
+void FunctionAST::Typecheck()
 {
     assert(name != "");
     assert(returnType);
@@ -231,10 +231,10 @@ void FunctionAST::Typecheck() const
     {
         foundMain = true;
 
-        if (returnType->type != TypeEnum::Integer)
+        if (!is<IntegerType>(returnType))
             g_context->Error(location, "Main function must return an integer");
 
-        if (params.size() == 2 && (params[0].type->type != TypeEnum::Integer || params[1].type->type != TypeEnum::Pointer))
+        if (params.size() == 2 && (!is<IntegerType>(params[0].type) || !is<PointerType>(params[1].type)))
             g_context->Error(location, "Invalid main function parameters");
 
         if (params.size() != 0 && params.size() != 2)
@@ -246,7 +246,7 @@ void FunctionAST::Typecheck() const
         block->Typecheck();
 
         // TODO: This is not an ideal solution, but it works for now
-        if (returnType->type != TypeEnum::Void)
+        if (!is<VoidType>(returnType))
         {
             if (block->statements.size() == 0)
                 g_context->Error(location, "Function must have a return statement");
@@ -255,7 +255,7 @@ void FunctionAST::Typecheck() const
             if (!std::holds_alternative<Ref<StatementAST>>(lastStatement))
                 g_context->Error(location, "Last statement must be a return statement");
 
-            if (std::get<Ref<StatementAST>>(lastStatement)->type != StatementType::Return)
+            if (!is<ReturnStatementAST>(std::get<Ref<StatementAST>>(lastStatement)))
                 g_context->Error(location, "Last statement must be a return statement");
         }
     }
@@ -264,7 +264,7 @@ void FunctionAST::Typecheck() const
     typecheckCurrentFunction = "";
 }
 
-void ParsedFile::Typecheck() const
+void ParsedFile::Typecheck()
 {
     blockStack.push_back({});
 

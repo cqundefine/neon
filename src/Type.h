@@ -3,24 +3,9 @@
 #include <Utils.h>
 #include <llvm/IR/Type.h>
 
-enum class TypeEnum
-{
-    Integer,
-    Array,
-    Pointer,
-    Struct,
-    Void
-};
-
 struct Type
 {
-    TypeEnum type;
     bool isRef = false;
-
-    inline Type(TypeEnum type)
-        : type(type)
-    {
-    }
 
     virtual llvm::Type* GetType() const = 0;
     virtual std::string Dump() const = 0;
@@ -33,7 +18,7 @@ struct Type
 
     bool operator==(const Type& other) const
     {
-        if (other.type != type)
+        if (typeid(other) != typeid(*this))
             return false;
         return Equals(other);
     }
@@ -50,8 +35,7 @@ struct IntegerType : public Type
     bool isSigned;
 
     inline IntegerType(uint16_t bits, bool isSigned)
-        : Type(TypeEnum::Integer)
-        , bits(bits)
+        : bits(bits)
         , isSigned(isSigned)
     {
     }
@@ -72,8 +56,7 @@ struct ArrayType : public Type
     uint64_t size;
 
     inline ArrayType(Ref<Type> arrayType, uint64_t size)
-        : Type(TypeEnum::Array)
-        , arrayType(arrayType)
+        : arrayType(arrayType)
         , size(size)
     {
     }
@@ -93,8 +76,7 @@ struct PointerType : public Type
     Ref<Type> underlayingType;
 
     inline PointerType(Ref<Type> underlayingType)
-        : Type(TypeEnum::Pointer)
-        , underlayingType(underlayingType)
+        : underlayingType(underlayingType)
     {
     }
 
@@ -113,8 +95,7 @@ struct StructType : public Type
     std::string name;
 
     inline StructType(const std::string& name)
-        : Type(TypeEnum::Struct)
-        , name(name)
+        : name(name)
     {
     }
 
@@ -133,7 +114,6 @@ struct StructType : public Type
 struct VoidType : public Type
 {
     inline VoidType()
-        : Type(TypeEnum::Void)
     {
     }
 

@@ -1,3 +1,4 @@
+#include "Type.h"
 #include <AST.h>
 
 Ref<ParsedFile> g_parsedFile;

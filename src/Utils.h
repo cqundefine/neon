@@ -4,6 +4,14 @@
 #include <llvm/IR/DebugInfoMetadata.h>
 #include <memory>
 
+#ifdef ALWAYS_INLINE
+    #undef ALWAYS_INLINE
+#endif
+#define ALWAYS_INLINE __attribute__((always_inline)) inline
+
+template <typename From, typename To>
+using CopyConst = std::conditional_t<std::is_const_v<From>, std::add_const_t<To>, std::remove_const_t<To>>;
+
 template <typename T>
 using Own = std::unique_ptr<T>;
 template <typename T, typename... Args>

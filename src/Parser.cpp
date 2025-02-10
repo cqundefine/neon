@@ -1,5 +1,7 @@
+#include "Utils.h"
 #include <Parser.h>
 #include <Type.h>
+#include <TypeCasts.h>
 #include <stack>
 
 Ref<ParsedFile> Parser::Parse()
@@ -56,7 +58,7 @@ Ref<ParsedFile> Parser::Parse()
                 g_context->Error(nameToken.location, "Expected struct name");
             ExpectToken(TokenType::LCurly);
 
-            std::map<std::string, std::pair<Ref<Type>, Location>> members;
+            std::map<std::string, Ref<Type>> members;
 
             while (m_stream.PeekToken().type == TokenType::Identifier)
             {
@@ -64,7 +66,8 @@ Ref<ParsedFile> Parser::Parse()
                 ExpectToken(TokenType::Colon);
                 auto typeLocation = ParseType();
 
-                members[name.stringValue] = typeLocation;
+                typeLocation.first->Typecheck(typeLocation.second);
+                members[name.stringValue] = std::move(typeLocation.first);
 
                 ExpectToken(TokenType::Semicolon);
             }
@@ -77,14 +80,13 @@ Ref<ParsedFile> Parser::Parse()
             uint64_t debugOffset = 0;
             for (auto& [name, type] : members)
             {
-                type.first->Typecheck(type.second);
-                llvmMembers.push_back(type.first->GetType());
-                rawMembers[name] = type.first;
+                llvmMembers.push_back(type->GetType());
+                rawMembers[name] = type;
                 if (g_context->debug)
                 {
                     auto file = nameToken.location.GetFile().debugFile;
-                    auto size = g_context->module->getDataLayout().getTypeAllocSizeInBits(type.first->GetType());
-                    debugTypes.push_back(g_context->debugBuilder->createMemberType(file, name, file, nameToken.location.line, size, 0, debugOffset, llvm::DINode::FlagZero, type.first->GetDebugType()));
+                    auto size = g_context->module->getDataLayout().getTypeAllocSizeInBits(type->GetType());
+                    debugTypes.push_back(g_context->debugBuilder->createMemberType(file, name, file, nameToken.location.line, size, 0, debugOffset, llvm::DINode::FlagZero, type->GetDebugType()));
                     debugOffset += size;
                 }
             }
@@ -396,7 +398,7 @@ Ref<ExpressionAST> Parser::ParseBarePrimary()
     else if (first.type == TokenType::Asterisk)
     {
         auto child = ParsePrimary();
-        if (child->type != ExpressionType::Variable)
+        if (!is<VariableExpressionAST>(child))
             g_context->Error(first.location, "Can't dereference this expression");
         return MakeRef<DereferenceExpressionAST>(first.location, StaticRefCast<VariableExpressionAST>(child));
     }
