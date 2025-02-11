@@ -343,7 +343,7 @@ void ReturnStatementAST::Codegen() const
     EmitLocation();
     if (!value)
         g_context->builder->CreateRetVoid();
-    else if (auto* valueInt = as<IntegerType>(value->GetType()))
+    else if (auto* valueInt = as_if<IntegerType>(value->GetType()))
         g_context->builder->CreateRet(
             g_context->builder->CreateIntCast(value->Codegen(), returnedType->GetType(), valueInt->isSigned, "bincast"));
     else
