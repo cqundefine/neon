@@ -44,6 +44,7 @@ ERROR = f"{ERROR_COLOR}ERROR{RESET_COLOR}"
 FAILURE = f"{ERROR_COLOR}FAILURE{RESET_COLOR}"
 DOESNT_BUILD = f"{ERROR_COLOR}FAILURE (doesn\'t build){RESET_COLOR}"
 COMPILER_CRASH = f"{ERROR_COLOR}FAILURE (compiler crashed){RESET_COLOR}"
+DIDNT_CRASH = f"{OK_COLOR}PASS (didn't crash){RESET_COLOR}"
 
 NON_OPTIMIZED = "non-optimized"
 OPTIMIZED = "optimized"
@@ -193,20 +194,26 @@ def run_test_for_file(file_path: str, stats: RunStats = RunStats()):
     tc_path = file_path[:-len(NEON_EXT)] + ".txt"
     tc = load_test_case(tc_path)
 
+    # NOTE: Even though we expect this to fail, it might still produce an output file.
+    output_location = os.path.join(output_target, os.path.dirname(file_path)[len(target):])
+    os.makedirs(output_location, exist_ok=True)
+
+    output_filename = os.path.join(output_location, os.path.basename(file_path)[:-len(NEON_EXT)])
+
     if tc is None:
-        print(f"{WARNING}: Could not find test case data for {human_test_name}. Ignoring testing.")
+        print(f"{WARNING}: Could not find test case data for {human_test_name}. Only making sure the compiler doesn't crash: ", end="")
+        compilation = cmd_run([COMPILER_PATH, "-o", output_filename, file_path], capture_output=True)
+        if compilation.returncode in [0, 1]:
+            print(DIDNT_CRASH)
+        else:
+            print(COMPILER_CRASH)
+
         stats.ignored_files.append(human_test_name)
         stats.ignored += 1
         return
 
     if not tc.builds:
         print(f"{INFO}: Testing {human_test_name} expected build fail: ", end="")
-
-        # NOTE: Even though we expect this to fail, it might still produce an output file.
-        output_location = os.path.join(output_target, os.path.dirname(file_path)[len(target):])
-        os.makedirs(output_location, exist_ok=True)
-
-        output_filename = os.path.join(output_location, os.path.basename(file_path)[:-len(NEON_EXT)])
 
         compilation = cmd_run([COMPILER_PATH, "-o", output_filename, file_path], capture_output=True)
         if compilation.returncode == 1:
