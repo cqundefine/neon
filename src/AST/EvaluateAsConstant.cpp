@@ -14,7 +14,10 @@ llvm::Constant* StringLiteralAST::EvaluateAsConstant() const
 
     auto charArray = llvm::ConstantArray::get(llvm::ArrayType::get(llvm::Type::getInt8Ty(*g_context->llvmContext), chars.size()), chars);
     auto rawString = new llvm::GlobalVariable(*g_context->module, charArray->getType(), true, llvm::GlobalValue::PrivateLinkage, charArray);
-    auto stringStruct = llvm::ConstantStruct::get(g_context->structs.at("string").llvmType, { llvm::ConstantExpr::getBitCast(rawString, llvm::Type::getInt8Ty(*g_context->llvmContext)->getPointerTo()), llvm::ConstantInt::get(*g_context->llvmContext, llvm::APInt(64, value.size())) });
+    auto stringStruct = llvm::ConstantStruct::get(
+        g_context->structs.at("string").llvmType,
+        {llvm::ConstantExpr::getBitCast(rawString, llvm::Type::getInt8Ty(*g_context->llvmContext)->getPointerTo()),
+         llvm::ConstantInt::get(*g_context->llvmContext, llvm::APInt(64, value.size()))});
 
     return stringStruct;
 }

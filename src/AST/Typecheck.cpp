@@ -19,7 +19,7 @@ static std::vector<std::map<std::string, VariableInfo>> blockStack;
             return block.at(name);
     }
 
-    g_context->Error(location, "Can't find variable: %s", name.c_str());
+    g_context->Error(location, "Can't find variable: {}", name);
 }
 
 static std::string typecheckCurrentFunction;
@@ -54,26 +54,29 @@ void BinaryExpressionAST::Typecheck()
         as<NumberExpressionAST>(rhs)->AdjustType(StaticRefCast<IntegerType>(lhs->GetType()));
 
     if (*lhs->GetType() != *rhs->GetType())
-        g_context->Error(location, "Wrong binary operation: %s with type %s", lhs->GetType()->ReadableName().c_str(), rhs->GetType()->ReadableName().c_str());
+        g_context->Error(
+            location, "Wrong binary operation: {} with type {}", lhs->GetType()->ReadableName(), rhs->GetType()->ReadableName());
 
-    if (binaryOperation == BinaryOperation::Assignment && !is<VariableExpressionAST>(lhs) && !is<ArrayAccessExpressionAST>(lhs) && !is<DereferenceExpressionAST>(lhs) && !is<MemberAccessExpressionAST>(lhs))
+    if (binaryOperation == BinaryOperation::Assignment && !is<VariableExpressionAST>(lhs) && !is<ArrayAccessExpressionAST>(lhs) &&
+        !is<DereferenceExpressionAST>(lhs) && !is<MemberAccessExpressionAST>(lhs))
         g_context->Error(location, "Can't assign to non-variable expression");
 
-    if (binaryOperation == BinaryOperation::Assignment && is<VariableExpressionAST>(lhs) && FindVariable(as<VariableExpressionAST>(lhs)->name, lhs->location).isConst)
+    if (binaryOperation == BinaryOperation::Assignment && is<VariableExpressionAST>(lhs) &&
+        FindVariable(as<VariableExpressionAST>(lhs)->name, lhs->location).isConst)
         g_context->Error(location, "Can't assign to const variable");
 }
 
 void CallExpressionAST::Typecheck()
 {
     if (typecheckFunctions.find(calleeName) == typecheckFunctions.end())
-        g_context->Error(location, "Can't find function: %s", calleeName.c_str());
+        g_context->Error(location, "Can't find function: {}", calleeName);
 
     auto function = typecheckFunctions[calleeName];
 
     returnedType = function.returnType;
 
     if (function.params.size() != args.size())
-        g_context->Error(location, "Wrong number of arguments: %d, expected %d", args.size(), function.params.size());
+        g_context->Error(location, "Wrong number of arguments: {}, expected {}", args.size(), function.params.size());
 
     for (int i = 0; i < args.size(); i++)
     {
@@ -83,7 +86,8 @@ void CallExpressionAST::Typecheck()
             as<NumberExpressionAST>(args[i])->AdjustType(StaticRefCast<IntegerType>(function.params[i]));
 
         if (*args[i]->GetType() != *function.params[i])
-            g_context->Error(location, "Wrong argument type: %s, expected %s", args[i]->GetType()->ReadableName().c_str(), function.params[i]->ReadableName().c_str());
+            g_context->Error(
+                location, "Wrong argument type: {}, expected {}", args[i]->GetType()->ReadableName(), function.params[i]->ReadableName());
     }
 }
 
@@ -92,10 +96,10 @@ void CastExpressionAST::Typecheck()
     child->Typecheck();
 
     if (!is<IntegerType>(child->GetType()) && !is<PointerType>(child->GetType()))
-        g_context->Error(location, "Can't cast from type %s", child->GetType()->ReadableName().c_str());
+        g_context->Error(location, "Can't cast from type {}", child->GetType()->ReadableName());
 
     if (!is<IntegerType>(castedTo) && !is<PointerType>(castedTo))
-        g_context->Error(location, "Can't cast to type %s", castedTo->ReadableName().c_str());
+        g_context->Error(location, "Can't cast to type {}", castedTo->ReadableName());
 }
 
 void ArrayAccessExpressionAST::Typecheck()
@@ -112,7 +116,7 @@ void DereferenceExpressionAST::Typecheck()
     pointer->Typecheck();
 
     if (!is<PointerType>(pointer->type))
-        g_context->Error(location, "Can't dereference non-pointer type: %s", pointer->type->ReadableName().c_str());
+        g_context->Error(location, "Can't dereference non-pointer type: {}", pointer->type->ReadableName());
 }
 
 void MemberAccessExpressionAST::Typecheck()
@@ -120,7 +124,7 @@ void MemberAccessExpressionAST::Typecheck()
     object->Typecheck();
 
     if (!is<StructType>(object->GetType()))
-        g_context->Error(location, "Can't access member of non-struct type: %s", object->GetType()->ReadableName().c_str());
+        g_context->Error(location, "Can't access member of non-struct type: {}", object->GetType()->ReadableName());
 
     auto structType = as<StructType>(object->GetType());
     for (const auto& [memberName, memberType] : g_context->structs[structType->name].members)
@@ -131,7 +135,7 @@ void MemberAccessExpressionAST::Typecheck()
         }
     }
 
-    g_context->Error(location, "Can't access member %s", memberName.c_str());
+    g_context->Error(location, "Can't access member {}", memberName);
 }
 
 void ReturnStatementAST::Typecheck()
@@ -146,7 +150,8 @@ void ReturnStatementAST::Typecheck()
             as<NumberExpressionAST>(value)->AdjustType(StaticRefCast<IntegerType>(returnedType));
 
         if (*value->GetType() != *returnedType)
-            g_context->Error(location, "Wrong return type: %s, expected %s", value->GetType()->ReadableName().c_str(), returnedType->ReadableName().c_str());
+            g_context->Error(
+                location, "Wrong return type: {}, expected {}", value->GetType()->ReadableName(), returnedType->ReadableName());
     }
 }
 
@@ -191,13 +196,14 @@ void VariableDefinitionAST::Typecheck()
         initialValue->Typecheck();
 
         if (*initialValue->GetType() != *type)
-            g_context->Error(location, "Wrong variable type: %s, expected %s", initialValue->GetType()->ReadableName().c_str(), type->ReadableName().c_str());
+            g_context->Error(
+                location, "Wrong variable type: {}, expected {}", initialValue->GetType()->ReadableName(), type->ReadableName());
 
         if (auto* number = as_if<NumberExpressionAST>(initialValue))
             number->AdjustType(StaticRefCast<IntegerType>(type));
     }
 
-    blockStack.back()[name] = { type, isConst };
+    blockStack.back()[name] = {type, isConst};
 }
 
 void FunctionAST::Typecheck()
@@ -208,7 +214,7 @@ void FunctionAST::Typecheck()
     typecheckCurrentFunction = name;
     blockStack.push_back({});
 
-    blockStack.back()[name] = { returnType, false };
+    blockStack.back()[name] = {returnType, false};
 
     std::vector<Ref<Type>> typecheckParams;
     for (const auto& param : params)
@@ -217,15 +223,12 @@ void FunctionAST::Typecheck()
 
         param.type->Typecheck(location);
 
-        blockStack.back()[param.name] = { param.type, false };
+        blockStack.back()[param.name] = {param.type, false};
     }
 
     returnType->Typecheck(location);
 
-    typecheckFunctions[name] = {
-        .params = typecheckParams,
-        .returnType = returnType
-    };
+    typecheckFunctions[name] = {.params = typecheckParams, .returnType = returnType};
 
     if (name == "main")
     {
@@ -269,13 +272,13 @@ void ParsedFile::Typecheck()
     blockStack.push_back({});
 
     auto int64 = MakeRef<IntegerType>(64, false);
-    typecheckFunctions["syscall0"] = { .params = { int64 }, .returnType = int64 };
-    typecheckFunctions["syscall1"] = { .params = { int64, int64 }, .returnType = int64 };
-    typecheckFunctions["syscall2"] = { .params = { int64, int64, int64 }, .returnType = int64 };
-    typecheckFunctions["syscall3"] = { .params = { int64, int64, int64, int64 }, .returnType = int64 };
-    typecheckFunctions["syscall4"] = { .params = { int64, int64, int64, int64, int64 }, .returnType = int64 };
-    typecheckFunctions["syscall5"] = { .params = { int64, int64, int64, int64, int64, int64 }, .returnType = int64 };
-    typecheckFunctions["syscall6"] = { .params = { int64, int64, int64, int64, int64, int64, int64 }, .returnType = int64 };
+    typecheckFunctions["syscall0"] = {.params = {int64}, .returnType = int64};
+    typecheckFunctions["syscall1"] = {.params = {int64, int64}, .returnType = int64};
+    typecheckFunctions["syscall2"] = {.params = {int64, int64, int64}, .returnType = int64};
+    typecheckFunctions["syscall3"] = {.params = {int64, int64, int64, int64}, .returnType = int64};
+    typecheckFunctions["syscall4"] = {.params = {int64, int64, int64, int64, int64}, .returnType = int64};
+    typecheckFunctions["syscall5"] = {.params = {int64, int64, int64, int64, int64, int64}, .returnType = int64};
+    typecheckFunctions["syscall6"] = {.params = {int64, int64, int64, int64, int64, int64, int64}, .returnType = int64};
 
     for (const auto& variable : globalVariables)
         variable->Typecheck();

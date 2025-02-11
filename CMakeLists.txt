@@ -1,8 +1,9 @@
 cmake_minimum_required(VERSION 3.20)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+set(CMAKE_COLOR_DIAGNOSTICS ON)
 
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED TRUE)
 
 if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
@@ -15,7 +16,7 @@ project(Neon)
 
 include_directories(src)
 
-add_compile_options(-fdiagnostics-color=always)
+add_compile_options(-Wno-deprecated-declarations)
 
 file(GLOB_RECURSE SOURCES src/*.cpp src/AST/*.cpp)
 add_executable(Neon ${SOURCES})

@@ -37,7 +37,8 @@ Context::Context(const std::string& baseFile, std::optional<std::string> passedT
     rootFileID = LoadFile(baseFile);
 
     if (debug)
-        debugCompileUnit = debugBuilder->createCompileUnit(llvm::dwarf::DW_LANG_C, debugBuilder->createFile(files.at(rootFileID).filename, "."), "Neon", false, "", 0);
+        debugCompileUnit = debugBuilder->createCompileUnit(
+            llvm::dwarf::DW_LANG_C, debugBuilder->createFile(files.at(rootFileID).filename, "."), "Neon", false, "", 0);
 
     if (optimize)
     {
@@ -76,7 +77,7 @@ Context::Context(const std::string& baseFile, std::optional<std::string> passedT
 
     if (!target)
     {
-        fprintf(stderr, "Error loading target %s: %s\n", targetTriple.c_str(), error.c_str());
+        std::println(std::cerr, "Error loading target {}: {}", targetTriple, error);
         exit(1);
     }
 
@@ -89,7 +90,7 @@ Context::Context(const std::string& baseFile, std::optional<std::string> passedT
 
     if (targetMachine->getPointerSizeInBits(0) != 64)
     {
-        fprintf(stderr, "Unsupported pointer size: %d!\n", targetMachine->getPointerSizeInBits(0));
+        std::println(std::cerr, "Unsupported pointer size: {}", targetMachine->getPointerSizeInBits(0));
         exit(1);
     }
 
@@ -103,7 +104,7 @@ Context::Context(const std::string& baseFile, std::optional<std::string> passedT
     }
     else
     {
-        fprintf(stderr, "Unsupported architecture: %s, not enabling syscalls or preprocessor arch directives!\n", arch.c_str());
+        std::println(std::cerr, "Unsupported architecture: {}, not enabling syscalls or preprocessor arch directives!", arch);
     }
 }
 
@@ -111,7 +112,7 @@ void Context::CreateSyscall(uint32_t number, std::string mnemonic, std::string r
 {
     if (auto function = module->getFunction(std::string("syscall") + std::to_string(number)))
     {
-        std::vector<llvm::Value*> argsValues {};
+        std::vector<llvm::Value*> argsValues{};
         for (auto& arg : function->args())
             argsValues.push_back(&arg);
 
@@ -121,7 +122,14 @@ void Context::CreateSyscall(uint32_t number, std::string mnemonic, std::string r
         auto block = llvm::BasicBlock::Create(*llvmContext, "entry", function);
         builder->SetInsertPoint(block);
 
-        auto inlineAsm = llvm::InlineAsm::get(function->getFunctionType(), mnemonic, std::string("=") + returnRegister + "," + registers + ",~{memory},~{dirflag},~{fpsr},~{flags}", true, true, llvm::InlineAsm::AsmDialect::AD_ATT, false);
+        auto inlineAsm = llvm::InlineAsm::get(
+            function->getFunctionType(),
+            mnemonic,
+            std::string("=") + returnRegister + "," + registers + ",~{memory},~{dirflag},~{fpsr},~{flags}",
+            true,
+            true,
+            llvm::InlineAsm::AsmDialect::AD_ATT,
+            false);
         auto result = builder->CreateCall(inlineAsm, argsValues);
 
         builder->CreateRet(result);
@@ -143,14 +151,12 @@ uint32_t Context::LoadFile(const std::string& filename)
 
     uint32_t fileID = lastFileID++;
     auto debugFile = debug ? debugBuilder->createFile(filename, ".") : nullptr;
-    files[fileID] = { filename, ReadFile(filename), debugFile };
+    files[fileID] = {filename, ReadFile(filename), debugFile};
     return fileID;
 }
 
 std::pair<uint32_t, uint32_t> Context::LineColumnFromLocation(uint32_t fileID, size_t index) const
 {
-    assert(fileID != UINT32_MAX);
-
     uint32_t line = 1;
     uint32_t column = 1;
 
@@ -167,25 +173,7 @@ std::pair<uint32_t, uint32_t> Context::LineColumnFromLocation(uint32_t fileID, s
         }
     }
 
-    return { line, column };
-}
-
-[[noreturn]] void Context::Error(Location location, const char* fmt, ...) const
-{
-    if (location.fileID != UINT32_MAX)
-    {
-        fprintf(stderr, "%s:%d:%d ", location.GetFile().filename.c_str(), location.line, location.column);
-    }
-
-    va_list va;
-    va_start(va, fmt);
-
-    vfprintf(stderr, fmt, va);
-    fputc('\n', stderr);
-
-    va_end(va);
-
-    exit(1);
+    return {line, column};
 }
 
 void Context::Finalize()
@@ -260,15 +248,19 @@ void Context::Write(OutputFileType fileType, std::optional<std::string> outputLo
 
     if (errorCode)
     {
-        fprintf(stderr, "Error writing output: %s", errorCode.message().c_str());
+        std::println(std::cerr, "Error writing output: {}", errorCode.message());
         exit(1);
     }
 
     llvm::legacy::PassManager pass;
 
-    if (targetMachine->addPassesToEmitFile(pass, outputStream, nullptr, fileType == OutputFileType::Assembly ? llvm::CodeGenFileType::AssemblyFile : llvm::CodeGenFileType::ObjectFile))
+    if (targetMachine->addPassesToEmitFile(
+            pass,
+            outputStream,
+            nullptr,
+            fileType == OutputFileType::Assembly ? llvm::CodeGenFileType::AssemblyFile : llvm::CodeGenFileType::ObjectFile))
     {
-        fprintf(stderr, "This machine can't emit this file type");
+        std::println(std::cerr, "This machine can't emit this file type");
         exit(1);
     }
 

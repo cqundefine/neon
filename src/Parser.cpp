@@ -28,7 +28,7 @@ Ref<ParsedFile> Parser::Parse()
                 ExpectToken(TokenType::Colon);
                 auto type = ParseType().first;
 
-                params.push_back({ maybeName.stringValue, type });
+                params.push_back({maybeName.stringValue, type});
 
                 Token maybeComma = m_stream.NextToken();
                 if (maybeComma.type != TokenType::Comma)
@@ -86,7 +86,8 @@ Ref<ParsedFile> Parser::Parse()
                 {
                     auto file = nameToken.location.GetFile().debugFile;
                     auto size = g_context->module->getDataLayout().getTypeAllocSizeInBits(type->GetType());
-                    debugTypes.push_back(g_context->debugBuilder->createMemberType(file, name, file, nameToken.location.line, size, 0, debugOffset, llvm::DINode::FlagZero, type->GetDebugType()));
+                    debugTypes.push_back(g_context->debugBuilder->createMemberType(
+                        file, name, file, nameToken.location.line, size, 0, debugOffset, llvm::DINode::FlagZero, type->GetDebugType()));
                     debugOffset += size;
                 }
             }
@@ -104,15 +105,20 @@ Ref<ParsedFile> Parser::Parse()
             if (g_context->debug)
             {
                 auto file = nameToken.location.GetFile().debugFile;
-                debugType = g_context->debugBuilder->createStructType(file, nameToken.stringValue, file, nameToken.location.line, g_context->module->getDataLayout().getTypeAllocSizeInBits(llvmType), 0, llvm::DINode::FlagPrototyped, nullptr, g_context->debugBuilder->getOrCreateArray(debugTypes));
+                debugType = g_context->debugBuilder->createStructType(
+                    file,
+                    nameToken.stringValue,
+                    file,
+                    nameToken.location.line,
+                    g_context->module->getDataLayout().getTypeAllocSizeInBits(llvmType),
+                    0,
+                    llvm::DINode::FlagPrototyped,
+                    nullptr,
+                    g_context->debugBuilder->getOrCreateArray(debugTypes));
             }
 
             g_context->structs[nameToken.stringValue] = {
-                .name = nameToken.stringValue,
-                .members = rawMembers,
-                .llvmType = llvmType,
-                .debugType = debugType
-            };
+                .name = nameToken.stringValue, .members = rawMembers, .llvmType = llvmType, .debugType = debugType};
         }
         else if (token.type == TokenType::Var || token.type == TokenType::Const)
         {
@@ -125,7 +131,7 @@ Ref<ParsedFile> Parser::Parse()
         }
         else
         {
-            g_context->Error(token.location, "Unexpected token: %s", token.ToString().c_str());
+            g_context->Error(token.location, "Unexpected token: {}", token);
         }
     }
     return MakeRef<ParsedFile>(functions, globalVariables);
@@ -213,11 +219,12 @@ Ref<VariableDefinitionAST> Parser::ParseVariableDefinition()
     {
         auto initialValue = ParseExpression();
         ExpectToken(TokenType::Semicolon);
-        return MakeRef<VariableDefinitionAST>(declaration.location, name.stringValue, type, declaration.type == TokenType::Const, initialValue);
+        return MakeRef<VariableDefinitionAST>(
+            declaration.location, name.stringValue, type, declaration.type == TokenType::Const, initialValue);
     }
     else
     {
-        g_context->Error(equalsOrSemicolon.location, "Unexpected token: %s", equalsOrSemicolon.ToString().c_str());
+        g_context->Error(equalsOrSemicolon.location, "Unexpected token: {}", equalsOrSemicolon);
     }
 }
 
@@ -302,7 +309,7 @@ Ref<ExpressionAST> Parser::ParseExpression()
             expressionStack.push(MakeRef<BinaryExpressionAST>(operator2.location, leftSide2, operator2.operation, rightSide2));
         }
 
-        operationStack.push({ operation.first, precedence, operation.second });
+        operationStack.push({operation.first, precedence, operation.second});
         expressionStack.push(right_side);
 
         lastPrecedence = precedence;
@@ -414,42 +421,31 @@ Ref<ExpressionAST> Parser::ParseBarePrimary()
     }
     else
     {
-        g_context->Error(first.location, "Unexpected token: %s", first.ToString().c_str());
+        g_context->Error(first.location, "Unexpected token: {}", first);
     }
 }
 
 std::pair<BinaryOperation, Location> Parser::ParseOperation()
 {
-    static_assert(static_cast<uint32_t>(BinaryOperation::_BinaryOperationCount) == 11, "Not all binary operations are handled in Parser::ParseOperation()");
+    static_assert(
+        static_cast<uint32_t>(BinaryOperation::_BinaryOperationCount) == 11,
+        "Not all binary operations are handled in Parser::ParseOperation()");
 
     Token token = m_stream.NextToken();
     switch (token.type)
     {
-        case TokenType::Plus:
-            return { BinaryOperation::Add, token.location };
-        case TokenType::Minus:
-            return { BinaryOperation::Subtract, token.location };
-        case TokenType::Asterisk:
-            return { BinaryOperation::Multiply, token.location };
-        case TokenType::Slash:
-            return { BinaryOperation::Divide, token.location };
-        case TokenType::DoubleEquals:
-            return { BinaryOperation::Equals, token.location };
-        case TokenType::NotEqual:
-            return { BinaryOperation::NotEqual, token.location };
-        case TokenType::GreaterThan:
-            return { BinaryOperation::GreaterThan, token.location };
-        case TokenType::GreaterThanOrEqual:
-            return { BinaryOperation::GreaterThanOrEqual, token.location };
-        case TokenType::LessThan:
-            return { BinaryOperation::LessThan, token.location };
-        case TokenType::LessThanOrEqual:
-            return { BinaryOperation::LessThanOrEqual, token.location };
-        case TokenType::Equals:
-            return { BinaryOperation::Assignment, token.location };
-        default:
-            m_stream.PreviousToken();
-            return { BinaryOperation::_BinaryOperationCount, token.location };
+        case TokenType::Plus:               return {BinaryOperation::Add, token.location};
+        case TokenType::Minus:              return {BinaryOperation::Subtract, token.location};
+        case TokenType::Asterisk:           return {BinaryOperation::Multiply, token.location};
+        case TokenType::Slash:              return {BinaryOperation::Divide, token.location};
+        case TokenType::DoubleEquals:       return {BinaryOperation::Equals, token.location};
+        case TokenType::NotEqual:           return {BinaryOperation::NotEqual, token.location};
+        case TokenType::GreaterThan:        return {BinaryOperation::GreaterThan, token.location};
+        case TokenType::GreaterThanOrEqual: return {BinaryOperation::GreaterThanOrEqual, token.location};
+        case TokenType::LessThan:           return {BinaryOperation::LessThan, token.location};
+        case TokenType::LessThanOrEqual:    return {BinaryOperation::LessThanOrEqual, token.location};
+        case TokenType::Equals:             return {BinaryOperation::Assignment, token.location};
+        default:                            m_stream.PreviousToken(); return {BinaryOperation::_BinaryOperationCount, token.location};
     }
 }
 
@@ -495,25 +491,25 @@ std::pair<Ref<Type>, Location> Parser::ParseType(bool allowVoid)
         auto size = m_stream.NextToken();
         ExpectToBe(size, TokenType::Number);
         ExpectToken(TokenType::RSquareBracket);
-        return { MakeRef<ArrayType>(type, size.intValue), typeToken.location };
+        return {MakeRef<ArrayType>(type, size.intValue), typeToken.location};
     }
     else
     {
         m_stream.PreviousToken();
     }
 
-    return { type, typeToken.location };
+    return {type, typeToken.location};
 }
 
 void Parser::ExpectToken(TokenType tokenType)
 {
     Token token = m_stream.NextToken();
     if (token.type != tokenType)
-        g_context->Error(token.location, "Unexpected token %s, expected %s", token.ToString().c_str(), TokenTypeToString(tokenType).c_str());
+        g_context->Error(token.location, "Unexpected token {}, expected {}", token, tokenType);
 }
 
 void Parser::ExpectToBe(Token token, TokenType tokenType)
 {
     if (token.type != tokenType)
-        g_context->Error(token.location, "Unexpected token %s, expected %s", token.ToString().c_str(), TokenTypeToString(tokenType).c_str());
+        g_context->Error(token.location, "Unexpected token {}, expected {}", token, tokenType);
 }

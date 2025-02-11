@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <llvm/IR/DIBuilder.h>
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/LegacyPassManager.h>
@@ -10,8 +11,11 @@
 
 #include <Type.h>
 #include <Utils.h>
+#include <format>
+#include <iostream>
 #include <map>
 #include <optional>
+#include <print>
 
 struct Context
 {
@@ -58,7 +62,17 @@ struct Context
     uint32_t LoadFile(const std::string& filename);
 
     std::pair<uint32_t, uint32_t> LineColumnFromLocation(uint32_t fileID, size_t index) const;
-    [[noreturn]] void Error(Location location, const char* fmt, ...) const;
+
+    template <class... Args>
+    [[noreturn]] void Error(Location location, std::string_view msg, Args&&... args) const
+    {
+        if (location.fileID.has_value())
+            std::print(std::cerr, "{}:{}:{} ", location.GetFile().filename, location.line, location.column);
+
+        std::println(std::cerr, "{}", std::vformat(msg, std::make_format_args(args...)));
+
+        exit(1);
+    }
 
     void Finalize();
 

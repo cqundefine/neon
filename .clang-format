@@ -1,16 +1,32 @@
-BasedOnStyle: Webkit
-BreakBeforeBraces: Custom
-BraceWrapping:
-  AfterClass:            true
-  AfterControlStatement: true
-  AfterEnum:             true
-  AfterFunction:         true
-  AfterNamespace:        true
-  AfterStruct:           true
-  AfterUnion:            true
-  BeforeCatch:           true
-  BeforeElse:            true
-IndentCaseLabels: true
-IndentPPDirectives: BeforeHash
+UseTab: Never
+IndentWidth: 4
+LineEnding: LF
+ColumnLimit: 140
 InsertNewlineAtEOF: true
-NamespaceIndentation: All
+
+BreakBeforeBraces: Allman
+AllowShortIfStatementsOnASingleLine: false
+IndentCaseLabels: true
+NamespaceIndentation: None
+FixNamespaceComments: false
+AllowAllConstructorInitializersOnNextLine: true
+BreakConstructorInitializers: BeforeComma
+AllowShortBlocksOnASingleLine: Never
+AlignTrailingComments: Always
+AllowShortFunctionsOnASingleLine: InlineOnly
+BinPackArguments: false
+BinPackParameters: false
+AlignAfterOpenBracket: AlwaysBreak
+AllowAllParametersOfDeclarationOnNextLine: false
+PenaltyBreakBeforeFirstCallParameter: 80
+PenaltyReturnTypeOnItsOwnLine: 1000
+ExperimentalAutoDetectBinPacking: false
+PointerAlignment: Left
+AlwaysBreakTemplateDeclarations: Yes
+AllowShortCaseLabelsOnASingleLine: true
+IndentExternBlock: NoIndent
+AccessModifierOffset: -4
+IndentPPDirectives: BeforeHash
+AlignEscapedNewlines: LeftWithLastLine
+AlignConsecutiveShortCaseStatements:
+  Enabled: true

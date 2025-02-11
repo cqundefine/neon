@@ -7,22 +7,22 @@
 
 std::string IntegerType::Dump() const
 {
-    return std::string("IntegerType (") + std::to_string(bits) + ", " + (isSigned ? "true" : "false") + ")";
+    return std::format("IntegerType ({}, {})", bits, isSigned);
 }
 
 std::string ArrayType::Dump() const
 {
-    return std::string("ArrayType (") + arrayType->Dump() + ", " + std::to_string(size) + ")";
+    return std::format("ArrayType ({}, {})", arrayType->Dump(), size);
 }
 
 std::string PointerType::Dump() const
 {
-    return std::string("PointerType (") + underlayingType->Dump() + ")";
+    return std::format("PointerType ({})", underlayingType->Dump());
 }
 
 std::string StructType::Dump() const
 {
-    return std::string("StructType (") + name + ")";
+    return std::format("StructType ({})", name);
 }
 
 std::string VoidType::Dump() const
@@ -180,7 +180,7 @@ llvm::Constant* StructType::GetDefaultValue() const
 
 llvm::Constant* VoidType::GetDefaultValue() const
 {
-    fprintf(stderr, "COMPILER ERROR: Can't get default value for void type\n");
+    std::println(std::cerr, "COMPILER ERROR: Can't get default value for void type");
     exit(1);
 }
 
@@ -213,7 +213,7 @@ void PointerType::Typecheck(Location location) const
 void StructType::Typecheck(Location location) const
 {
     if (g_context->structs.find(name) == g_context->structs.end())
-        g_context->Error(location, "Can't find struct: %s", name.c_str());
+        g_context->Error(location, "Can't find struct: {}", name);
 }
 
 void VoidType::Typecheck(Location location) const

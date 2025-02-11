@@ -2,12 +2,13 @@
 
 #include <Context.h>
 #include <Token.h>
+#include <span>
 
 class TokenStream
 {
 public:
-    explicit inline TokenStream(std::vector<Token> tokens)
-        : m_tokens(std::move(tokens))
+    explicit inline TokenStream(std::span<const Token> tokens)
+        : m_tokens(tokens.begin(), tokens.end())
     {
     }
 

@@ -48,7 +48,8 @@ TokenStream PreprocessSubfile(TokenStream stream)
                 stream.RemoveLastToken();
                 stream.RemoveLastToken();
 
-                bool conditionValue = std::find(g_context->defines.begin(), g_context->defines.end(), condition.stringValue) != g_context->defines.end();
+                bool conditionValue =
+                    std::find(g_context->defines.begin(), g_context->defines.end(), condition.stringValue) != g_context->defines.end();
                 while (true)
                 {
                     auto token = stream.NextToken();
@@ -65,7 +66,7 @@ TokenStream PreprocessSubfile(TokenStream stream)
                             break;
                         }
                         else
-                            g_context->Error(directive.location, "Unknown preprocessor directive, unexpected token: %s", directive.ToString().c_str());
+                            g_context->Error(directive.location, "Unknown preprocessor directive, unexpected token: {}", directive);
                     }
                     else if (!conditionValue)
                     {
@@ -75,7 +76,7 @@ TokenStream PreprocessSubfile(TokenStream stream)
             }
             else
             {
-                g_context->Error(directive.location, "Unknown preprocessor directive, unexpected token: %s", directive.ToString().c_str());
+                g_context->Error(directive.location, "Unknown preprocessor directive, unexpected token: {}", directive);
             }
         }
     }

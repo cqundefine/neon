@@ -9,58 +9,23 @@ int main(int argc, char** argv)
 {
     argparse::ArgumentParser program("neon");
 
-    program.add_argument("filename")
-        .help("input file");
-
-    program.add_argument("-o")
-        .help("output file");
-
-    program.add_argument("-c")
-        .help("compile to object file")
-        .flag();
-
-    program.add_argument("-r", "--run")
-        .help("run executable")
-        .flag();
-
-    program.add_argument("--target")
-        .help("target triple");
-
-    program.add_argument("--disable-dce")
-        .help("disable dead code elimination")
-        .flag();
+    program.add_argument("filename").help("input file");
+    program.add_argument("-o").help("output file");
+    program.add_argument("-c").help("compile to object file").flag();
+    program.add_argument("-r", "--run").help("run executable").flag();
+    program.add_argument("--target").help("target triple");
+    program.add_argument("--disable-dce").help("disable dead code elimination").flag();
 
     auto& optimizeDebugGroup = program.add_mutually_exclusive_group();
-
-    optimizeDebugGroup.add_argument("-O")
-        .help("optimize")
-        .flag();
-
-    optimizeDebugGroup.add_argument("-g")
-        .help("add debug information")
-        .flag();
+    optimizeDebugGroup.add_argument("-O").help("optimize").flag();
+    optimizeDebugGroup.add_argument("-g").help("add debug information").flag();
 
     auto& dumpGroup = program.add_mutually_exclusive_group();
-
-    dumpGroup.add_argument("--dump-tokens-before-preprocessor")
-        .help("dump tokens before preprocessor")
-        .flag();
-
-    dumpGroup.add_argument("--dump-tokens")
-        .help("dump tokens")
-        .flag();
-
-    dumpGroup.add_argument("--dump-ast")
-        .help("dump AST")
-        .flag();
-
-    dumpGroup.add_argument("--dump-ir")
-        .help("dump IR")
-        .flag();
-
-    dumpGroup.add_argument("--dump-asm")
-        .help("dump assembly")
-        .flag();
+    dumpGroup.add_argument("--dump-tokens-before-preprocessor").help("dump tokens before preprocessor").flag();
+    dumpGroup.add_argument("--dump-tokens").help("dump tokens").flag();
+    dumpGroup.add_argument("--dump-ast").help("dump AST").flag();
+    dumpGroup.add_argument("--dump-ir").help("dump IR").flag();
+    dumpGroup.add_argument("--dump-asm").help("dump assembly").flag();
 
     try
     {

@@ -1,4 +1,5 @@
 #include <TokenStream.h>
+#include <print>
 
 Token TokenStream::NextToken()
 {
@@ -45,11 +46,11 @@ void TokenStream::Dump()
     auto currentIndex = m_index;
 
     Token token;
-    printf("Dumping token stream:\n");
+    std::println("Dumping token stream:");
     do
     {
         token = NextToken();
-        printf("%s\n", token.ToString().c_str());
+        std::println("{}", token);
     } while (token.type != TokenType::Eof);
 
     m_index = currentIndex;

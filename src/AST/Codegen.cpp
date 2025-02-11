@@ -24,20 +24,11 @@ struct VariableInfoAlloca : public VariableInfo
     {
     }
 
-    virtual llvm::Value* GetValue() const override
-    {
-        return alloc;
-    }
+    virtual llvm::Value* GetValue() const override { return alloc; }
 
-    virtual llvm::Type* GetType() const override
-    {
-        return alloc->getAllocatedType();
-    }
+    virtual llvm::Type* GetType() const override { return alloc->getAllocatedType(); }
 
-    virtual bool IsConst() const override
-    {
-        return false;
-    }
+    virtual bool IsConst() const override { return false; }
 };
 
 struct VariableInfoGlobal : public VariableInfo
@@ -49,20 +40,11 @@ struct VariableInfoGlobal : public VariableInfo
     {
     }
 
-    virtual llvm::Value* GetValue() const override
-    {
-        return global;
-    }
+    virtual llvm::Value* GetValue() const override { return global; }
 
-    virtual llvm::Type* GetType() const override
-    {
-        return global->getValueType();
-    }
+    virtual llvm::Type* GetType() const override { return global->getValueType(); }
 
-    virtual bool IsConst() const override
-    {
-        return global->isConstant();
-    }
+    virtual bool IsConst() const override { return global->isConstant(); }
 };
 
 static std::vector<std::map<std::string, Ref<VariableInfo>>> blockStack;
@@ -75,7 +57,7 @@ static std::vector<std::map<std::string, Ref<VariableInfo>>> blockStack;
             return block.at(name);
     }
 
-    fprintf(stderr, "COMPILER INTERNAL ERROR: Variable not found at codegen stage, this is a typechecker or codegen bug\n");
+    std::println(std::cerr, "COMPILER ERROR: Variable not found at codegen stage, this is a typechecker or codegen bug");
     exit(1);
 }
 
@@ -127,7 +109,9 @@ llvm::Value* StringLiteralAST::Codegen(bool) const
 llvm::Value* BinaryExpressionAST::Codegen(bool usedAsStatement) const
 {
     EmitLocation();
-    static_assert(static_cast<uint32_t>(BinaryOperation::_BinaryOperationCount) == 11, "Not all binary operations are handled in BinaryExpressionAST::Codegen()");
+    static_assert(
+        static_cast<uint32_t>(BinaryOperation::_BinaryOperationCount) == 11,
+        "Not all binary operations are handled in BinaryExpressionAST::Codegen()");
 
     if (binaryOperation == BinaryOperation::Assignment)
     {
@@ -200,21 +184,16 @@ llvm::Value* BinaryExpressionAST::Codegen(bool usedAsStatement) const
 
         switch (binaryOperation)
         {
-            case BinaryOperation::Add:
-                return g_context->builder->CreateAdd(lhsCodegenned, rhsCodegenned, "add");
-            case BinaryOperation::Subtract:
-                return g_context->builder->CreateSub(lhsCodegenned, rhsCodegenned, "sub");
-            case BinaryOperation::Multiply:
-                return g_context->builder->CreateMul(lhsCodegenned, rhsCodegenned, "mul");
+            case BinaryOperation::Add:      return g_context->builder->CreateAdd(lhsCodegenned, rhsCodegenned, "add");
+            case BinaryOperation::Subtract: return g_context->builder->CreateSub(lhsCodegenned, rhsCodegenned, "sub");
+            case BinaryOperation::Multiply: return g_context->builder->CreateMul(lhsCodegenned, rhsCodegenned, "mul");
             case BinaryOperation::Divide:
                 if (isLHSSigned)
                     return g_context->builder->CreateSDiv(lhsCodegenned, rhsCodegenned, "div");
                 else
                     return g_context->builder->CreateUDiv(lhsCodegenned, rhsCodegenned, "div");
-            case BinaryOperation::Equals:
-                return g_context->builder->CreateICmpEQ(lhsCodegenned, rhsCodegenned, "eq");
-            case BinaryOperation::NotEqual:
-                return g_context->builder->CreateICmpNE(lhsCodegenned, rhsCodegenned, "ne");
+            case BinaryOperation::Equals:   return g_context->builder->CreateICmpEQ(lhsCodegenned, rhsCodegenned, "eq");
+            case BinaryOperation::NotEqual: return g_context->builder->CreateICmpNE(lhsCodegenned, rhsCodegenned, "ne");
             case BinaryOperation::GreaterThan:
                 if (isLHSSigned)
                     return g_context->builder->CreateICmpSGT(lhsCodegenned, rhsCodegenned, "gt");
@@ -235,8 +214,7 @@ llvm::Value* BinaryExpressionAST::Codegen(bool usedAsStatement) const
                     return g_context->builder->CreateICmpSLE(lhsCodegenned, rhsCodegenned, "le");
                 else
                     return g_context->builder->CreateICmpULE(lhsCodegenned, rhsCodegenned, "le");
-            default:
-                assert(false);
+            default: assert(false);
         }
     }
     else
@@ -255,8 +233,10 @@ llvm::Value* CallExpressionAST::Codegen(bool) const
     for (const auto& arg : function->args())
     {
         auto codegennedArg = args[arg.getArgNo()]->RawCodegen();
-        if (codegennedArg->getType()->getTypeID() == llvm::Type::TypeID::IntegerTyID && arg.getType()->getTypeID() == llvm::Type::TypeID::IntegerTyID)
-            codegennedArg = g_context->builder->CreateIntCast(codegennedArg, arg.getType(), as<IntegerType>(args[arg.getArgNo()]->GetType())->isSigned, "intcast");
+        if (codegennedArg->getType()->getTypeID() == llvm::Type::TypeID::IntegerTyID &&
+            arg.getType()->getTypeID() == llvm::Type::TypeID::IntegerTyID)
+            codegennedArg = g_context->builder->CreateIntCast(
+                codegennedArg, arg.getType(), as<IntegerType>(args[arg.getArgNo()]->GetType())->isSigned, "intcast");
         codegennedArgs.push_back(codegennedArg);
     }
 
@@ -274,7 +254,8 @@ llvm::Value* CastExpressionAST::Codegen(bool) const
     EmitLocation();
     auto numberType = reinterpret_cast<IntegerType*>(castedTo.get());
     if (is<IntegerType>(child->GetType()) && is<IntegerType>(castedTo))
-        return g_context->builder->CreateIntCast(child->Codegen(), numberType->GetType(), as<IntegerType>(child->GetType())->isSigned, "intcast");
+        return g_context->builder->CreateIntCast(
+            child->Codegen(), numberType->GetType(), as<IntegerType>(child->GetType())->isSigned, "intcast");
     else if (is<IntegerType>(child->GetType()) && is<PointerType>(castedTo))
         return g_context->builder->CreateIntToPtr(child->Codegen(), numberType->GetType(), "inttoptr");
     else if (is<PointerType>(child->GetType()) && is<IntegerType>(castedTo))
@@ -309,7 +290,8 @@ llvm::Value* ArrayAccessExpressionAST::Codegen(bool) const
 llvm::Value* DereferenceExpressionAST::Codegen(bool) const
 {
     EmitLocation();
-    return g_context->builder->CreateLoad(as<PointerType>(pointer->GetType())->underlayingType->GetType(), pointer->Codegen(), pointer->name);
+    return g_context->builder->CreateLoad(
+        as<PointerType>(pointer->GetType())->underlayingType->GetType(), pointer->Codegen(), pointer->name);
 }
 
 llvm::Value* MemberAccessExpressionAST::Codegen(bool) const
@@ -362,7 +344,8 @@ void ReturnStatementAST::Codegen() const
     if (!value)
         g_context->builder->CreateRetVoid();
     else if (auto* valueInt = as<IntegerType>(value->GetType()))
-        g_context->builder->CreateRet(g_context->builder->CreateIntCast(value->Codegen(), returnedType->GetType(), valueInt->isSigned, "bincast"));
+        g_context->builder->CreateRet(
+            g_context->builder->CreateIntCast(value->Codegen(), returnedType->GetType(), valueInt->isSigned, "bincast"));
     else
         g_context->builder->CreateRet(value->Codegen());
 }
@@ -390,7 +373,8 @@ void IfStatementAST::Codegen() const
     if (conditionCodegenned->getType()->getTypeID() != llvm::Type::TypeID::IntegerTyID)
         g_context->Error(condition->location, "Condition must be an integer, this is probably a typechecker bug");
     auto bits = conditionCodegenned->getType()->getIntegerBitWidth();
-    auto conditionFinal = g_context->builder->CreateICmpNE(conditionCodegenned, llvm::ConstantInt::get(*g_context->llvmContext, llvm::APInt(bits, 0)), "ifcmpne");
+    auto conditionFinal = g_context->builder->CreateICmpNE(
+        conditionCodegenned, llvm::ConstantInt::get(*g_context->llvmContext, llvm::APInt(bits, 0)), "ifcmpne");
 
     auto parentFunction = g_context->builder->GetInsertBlock()->getParent();
 
@@ -441,7 +425,8 @@ void WhileStatementAST::Codegen() const
     if (conditionCodegenned->getType()->getTypeID() != llvm::Type::TypeID::IntegerTyID)
         g_context->Error(condition->location, "Condition must be an integer, this is probably a typechecker bug");
     auto bits = conditionCodegenned->getType()->getIntegerBitWidth();
-    auto conditionFinal = g_context->builder->CreateICmpNE(conditionCodegenned, llvm::ConstantInt::get(*g_context->llvmContext, llvm::APInt(bits, 0)), "whilecmpne");
+    auto conditionFinal = g_context->builder->CreateICmpNE(
+        conditionCodegenned, llvm::ConstantInt::get(*g_context->llvmContext, llvm::APInt(bits, 0)), "whilecmpne");
     g_context->builder->CreateCondBr(conditionFinal, loopBody, loopEnd);
 
     parentFunction->insert(parentFunction->end(), loopBody);
@@ -462,38 +447,54 @@ void VariableDefinitionAST::Codegen() const
         // FIXME: Do something about local constants
         auto parentFunction = g_context->builder->GetInsertBlock()->getParent();
         llvm::IRBuilder<> functionBeginBuilder(&parentFunction->getEntryBlock(), parentFunction->getEntryBlock().begin());
-        auto size = is<ArrayType>(type) ? llvm::ConstantInt::get(*g_context->llvmContext, llvm::APInt(64, as<ArrayType>(type)->size)) : nullptr;
+        auto size =
+            is<ArrayType>(type) ? llvm::ConstantInt::get(*g_context->llvmContext, llvm::APInt(64, as<ArrayType>(type)->size)) : nullptr;
 
         if (auto* structType = as_if<StructType>(type))
-            blockStack.back()[name] = MakeRef<VariableInfoAlloca>(functionBeginBuilder.CreateAlloca(structType->GetUnderlayingType(), size, name));
+            blockStack.back()[name] =
+                MakeRef<VariableInfoAlloca>(functionBeginBuilder.CreateAlloca(structType->GetUnderlayingType(), size, name));
         else
             blockStack.back()[name] = MakeRef<VariableInfoAlloca>(functionBeginBuilder.CreateAlloca(type->GetType(), size, name));
 
         if (g_context->debug)
         {
             auto file = location.GetFile().debugFile;
-            auto debugLocalVariable = g_context->debugBuilder->createAutoVariable(GetCurrentScope(), name, file, location.line, type->GetDebugType(), true);
-            g_context->debugBuilder->insertDeclare(FindVariable(name, location)->GetValue(), debugLocalVariable, g_context->debugBuilder->createExpression(), llvm::DILocation::get(parentFunction->getContext(), location.line, 0, GetCurrentScope()), functionBeginBuilder.GetInsertBlock()); // FIXME: Column
+            auto debugLocalVariable =
+                g_context->debugBuilder->createAutoVariable(GetCurrentScope(), name, file, location.line, type->GetDebugType(), true);
+            g_context->debugBuilder->insertDeclare(
+                FindVariable(name, location)->GetValue(),
+                debugLocalVariable,
+                g_context->debugBuilder->createExpression(),
+                llvm::DILocation::get(parentFunction->getContext(), location.line, 0, GetCurrentScope()),
+                functionBeginBuilder.GetInsertBlock()); // FIXME: Column
         }
 
         if (initialValue != nullptr)
         {
             auto initialValueCodegenned = initialValue->Codegen();
             if (auto* intType = as_if<IntegerType>(type))
-                initialValueCodegenned = g_context->builder->CreateIntCast(initialValueCodegenned, type->GetType(), intType->isSigned, "intcast");
+                initialValueCodegenned =
+                    g_context->builder->CreateIntCast(initialValueCodegenned, type->GetType(), intType->isSigned, "intcast");
 
             g_context->builder->CreateStore(initialValueCodegenned, FindVariable(name, location)->GetValue());
         }
     }
     else
     {
-        auto global = new llvm::GlobalVariable(*g_context->module, type->GetType(), isConst, llvm::GlobalValue::ExternalLinkage, initialValue ? initialValue->EvaluateAsConstant() : type->GetDefaultValue(), name);
+        auto global = new llvm::GlobalVariable(
+            *g_context->module,
+            type->GetType(),
+            isConst,
+            llvm::GlobalValue::ExternalLinkage,
+            initialValue ? initialValue->EvaluateAsConstant() : type->GetDefaultValue(),
+            name);
         blockStack.back()[name] = MakeRef<VariableInfoGlobal>(global);
 
         if (g_context->debug)
         {
             auto file = location.GetFile().debugFile;
-            auto debug = g_context->debugBuilder->createGlobalVariableExpression(GetCurrentScope(), name, "", file, location.line, type->GetDebugType(), false);
+            auto debug = g_context->debugBuilder->createGlobalVariableExpression(
+                GetCurrentScope(), name, "", file, location.line, type->GetDebugType(), false);
         }
     }
 }
@@ -534,7 +535,16 @@ llvm::Function* FunctionAST::Codegen() const
     if (g_context->debug)
     {
         auto file = location.GetFile().debugFile;
-        debugFunction = g_context->debugBuilder->createFunction(file, name, "", file, location.line, g_context->debugBuilder->createSubroutineType(g_context->debugBuilder->getOrCreateTypeArray(debugTypes)), 0, llvm::DINode::FlagPrototyped, llvm::DISubprogram::SPFlagDefinition);
+        debugFunction = g_context->debugBuilder->createFunction(
+            file,
+            name,
+            "",
+            file,
+            location.line,
+            g_context->debugBuilder->createSubroutineType(g_context->debugBuilder->getOrCreateTypeArray(debugTypes)),
+            0,
+            llvm::DINode::FlagPrototyped,
+            llvm::DISubprogram::SPFlagDefinition);
         function->setSubprogram(debugFunction);
 
         debugScopes.push_back(debugFunction);
@@ -556,8 +566,20 @@ llvm::Function* FunctionAST::Codegen() const
 
             if (g_context->debug)
             {
-                auto debugLocalVariable = g_context->debugBuilder->createParameterVariable(debugFunction, arg.getName(), arg.getArgNo() + 1, location.GetFile().debugFile, location.line, params.at(arg.getArgNo()).type->GetDebugType(), true);
-                g_context->debugBuilder->insertDeclare(alloca, debugLocalVariable, g_context->debugBuilder->createExpression(), llvm::DILocation::get(debugFunction->getContext(), location.line, 0, debugFunction), g_context->builder->GetInsertBlock()); // FIXME: Column
+                auto debugLocalVariable = g_context->debugBuilder->createParameterVariable(
+                    debugFunction,
+                    arg.getName(),
+                    arg.getArgNo() + 1,
+                    location.GetFile().debugFile,
+                    location.line,
+                    params.at(arg.getArgNo()).type->GetDebugType(),
+                    true);
+                g_context->debugBuilder->insertDeclare(
+                    alloca,
+                    debugLocalVariable,
+                    g_context->debugBuilder->createExpression(),
+                    llvm::DILocation::get(debugFunction->getContext(), location.line, 0, debugFunction),
+                    g_context->builder->GetInsertBlock()); // FIXME: Column
             }
 
             g_context->builder->CreateStore(&arg, alloca);

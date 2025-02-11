@@ -43,13 +43,13 @@ struct FileInfo
 
 struct Location
 {
-    uint32_t fileID;
+    std::optional<uint32_t> fileID;
     uint32_t line;
     uint32_t column;
 
     constexpr Location()
     {
-        fileID = UINT32_MAX;
+        fileID = {};
         line = 0;
         column = 0;
     }

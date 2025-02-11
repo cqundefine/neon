@@ -208,10 +208,7 @@ struct DereferenceExpressionAST : public ExpressionAST
     virtual void Typecheck() override;
     virtual void DCE() const override;
 
-    virtual inline Ref<Type> GetType() const override
-    {
-        return as<PointerType>(pointer->type.get())->underlayingType;
-    }
+    virtual inline Ref<Type> GetType() const override { return as<PointerType>(pointer->type.get())->underlayingType; }
 };
 
 struct MemberAccessExpressionAST : public ExpressionAST
