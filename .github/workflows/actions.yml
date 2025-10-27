@@ -29,7 +29,7 @@ jobs:
         run: |
           python3 test.py
       - name: upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: artifacts-${{ matrix.arch }}
           path: build/Neon
